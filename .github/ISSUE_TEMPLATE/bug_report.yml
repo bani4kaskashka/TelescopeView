@@ -1,0 +1,39 @@
+name: Bug report
+description: Something doesn't work, crashes or looks wrong.
+labels: [bug]
+body:
+  - type: textarea
+    id: what
+    attributes:
+      label: What happened
+      description: What you did, what you expected, and what happened instead.
+    validations:
+      required: true
+  - type: input
+    id: version
+    attributes:
+      label: TelescopeView version
+      placeholder: 0.1.0
+    validations:
+      required: true
+  - type: dropdown
+    id: os
+    attributes:
+      label: Operating system
+      options:
+        - Windows 11
+        - Windows 10
+        - macOS
+        - Linux
+    validations:
+      required: true
+  - type: input
+    id: file
+    attributes:
+      label: File type
+      description: The kind of file you were viewing, e.g. JPEG, HEIC, CBZ, a folder of webtoon pages.
+  - type: textarea
+    id: extra
+    attributes:
+      label: Anything else
+      description: Screenshots, a sample file, or the `IV_STATS=1` output if it was about speed.

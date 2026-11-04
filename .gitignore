@@ -1,0 +1,11 @@
+# Build output
+/target/
+/dist/
+
+# Editors and OS
+.vscode/
+.idea/
+*.swp
+.DS_Store
+Thumbs.db
+desktop.ini
