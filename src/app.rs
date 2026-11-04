@@ -481,7 +481,7 @@ pub struct Stats {
 }
 
 impl App {
-    pub fn new(cc: &eframe::CreationContext<'_>, initial: Option<PathBuf>) -> Self {
+    pub fn new(cc: &eframe::CreationContext<'_>, initial: Option<PathBuf>, restore: Restore) -> Self {
         theme::apply(&cc.egui_ctx, true, false);
         // Asked from the GPU itself: egui's own `max_texture_side` is still a 2048 placeholder
         // before the first frame, which would shrink every big photo (and slowly).
@@ -575,7 +575,11 @@ impl App {
         // Kept off screen until the picture (or the start screen) is really on it; see
         // `reveal_when_ready`.
         system::cloak(cc, true);
-        if app.settings.start_fullscreen {
+        // Maximized only now, while cloaked (see `Restore`).
+        if restore.maximized {
+            cc.egui_ctx.send_viewport_cmd(egui::ViewportCommand::Maximized(true));
+        }
+        if app.settings.start_fullscreen || restore.fullscreen {
             cc.egui_ctx.send_viewport_cmd(egui::ViewportCommand::Fullscreen(true));
         }
         // Without a file it shows the start screen, with the recent folders to pick from.
@@ -2102,6 +2106,14 @@ impl App {
         }
         ctx.request_repaint();
     }
+}
+
+/// How the window was left last time (maximized, full screen), put back once it's cloaked.
+/// Windows only: elsewhere eframe restores it itself.
+#[derive(Clone, Copy, Default)]
+pub struct Restore {
+    pub maximized: bool,
+    pub fullscreen: bool,
 }
 
 /// Startup: the window stays off screen until it has something to show.

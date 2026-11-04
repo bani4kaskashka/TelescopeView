@@ -33,6 +33,23 @@ fn main() -> eframe::Result {
     migrate_settings();
     // Show up in "Open with" and Default apps. Done off the UI thread; it's a few registry writes.
     std::thread::spawn(system::register_if_needed);
+    // A window coming back maximized (or full screen) from last time: winit maximizes a new
+    // window with ShowWindow, which puts it on screen even though eframe asks for it hidden, a
+    // blank white window before the app can cloak it. So it's made plain here and maximized
+    // in `App::new`, once cloaked.
+    let restore = std::rc::Rc::new(std::cell::Cell::new(app::Restore::default()));
+    let hook_restore = restore.clone();
+    let window_builder: Option<eframe::WindowBuilderHook> = cfg!(windows).then(|| {
+        Box::new(move |mut builder: egui::ViewportBuilder| {
+            hook_restore.set(app::Restore {
+                maximized: builder.maximized == Some(true),
+                fullscreen: builder.fullscreen == Some(true),
+            });
+            builder.maximized = None;
+            builder.fullscreen = None;
+            builder
+        }) as eframe::WindowBuilderHook
+    });
     let options = eframe::NativeOptions {
         viewport: egui::ViewportBuilder::default()
             .with_title(app::APP_NAME)
@@ -42,9 +59,14 @@ fn main() -> eframe::Result {
             .with_drag_and_drop(true)
             .with_icon(std::sync::Arc::new(theme::app_icon())),
         renderer: renderer(),
+        window_builder,
         ..Default::default()
     };
-    eframe::run_native(app::APP_NAME, options, Box::new(move |cc| Ok(Box::new(app::App::new(cc, initial)))))
+    eframe::run_native(
+        app::APP_NAME,
+        options,
+        Box::new(move |cc| Ok(Box::new(app::App::new(cc, initial, restore.get())))),
+    )
 }
 
 /// Settings and reading history from before the rename.
