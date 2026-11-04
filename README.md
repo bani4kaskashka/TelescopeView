@@ -11,8 +11,9 @@
 </p>
 
 <p align="center">
-  <b>The fastest image viewer.</b> The next picture is already decoded before you ask for it,<br>
-  so flipping through a folder never flickers or waits. Comics, manga and webtoons too.
+  <b>The fastest gallery viewer.</b> Pictures, videos, comics, manga, webtoons,<br>
+  and the formats other viewers won't open.<br>
+  The next picture is already decoded before you ask for it, so flipping through a folder never flickers or waits.
 </p>
 
 <p align="center">
@@ -34,6 +35,9 @@ a blurry preview or a spinner. TelescopeView works ahead of you:
   screen until the next one is fully ready, so nothing ever flashes.
 - **Instant, measured.** With 24-megapixel JPEGs on a Ryzen 7 5700X, every step was instant at
   6, 15 and 30 pictures per second. Set `IV_STATS=1` to log it on your own machine.
+- **One viewer for the whole folder.** Photos, camera RAW, HEIC, JPEG XL, EXR, DDS, PSD, SVG,
+  videos and comic archives all sit in the same gallery, so you never switch apps halfway
+  through a folder.
 - **Light on the system.** One GPU upload per frame at most, and zero CPU use while idle.
 - **Out of the way.** A flat, square, minimal interface with dark, light and high-contrast
   themes. The toolbar keeps to the everyday buttons; everything else lives one click away.
@@ -97,10 +101,15 @@ Settings are under the sliders button in the toolbar, or Ctrl+,.
 
 ## Making it your default viewer
 
-- **Windows:** in the **...** menu, choose **Make default image viewer**. It opens Windows'
-  Default apps page at TelescopeView, where you pick it for each file type. TelescopeView
-  registers itself for "Open with" on first start, for the current user only.
-- **Linux:** `install.sh` from the `.tar.gz` (or the `.deb`) adds the menu entry and "Open with".
+In the **...** menu, choose **Make default** and tick what TelescopeView should open: pictures,
+RAW photos, videos, comics, or single formats. Everything you leave unticked stays with the app
+that opens it now.
+
+- **Windows:** TelescopeView registers the ticked types and opens its own Default apps page in
+  Settings, where you pick it for each type (Windows doesn't let apps set themselves as the
+  default). It also registers for "Open with" on first start, for the current user only.
+- **Linux:** **Make default** sets it as the default for the ticked types through `xdg-mime`.
+  `install.sh` from the `.tar.gz` (or the `.deb`) adds the menu entry and "Open with".
 - **macOS:** open files from inside the app or drop them on the window. Finder's "Open With"
   is not supported yet.
 

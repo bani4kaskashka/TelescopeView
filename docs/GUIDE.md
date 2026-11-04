@@ -8,12 +8,14 @@ the shortcut list, and change any key in Settings, Shortcuts.
 - **Images:** PNG, APNG, JPEG, WebP, GIF (animated too), BMP, TIFF, ICO, TGA, QOI, PNM, HDR,
   EXR, DDS, Farbfeld, JPEG XL, SVG, PSD.
   On Windows also anything with an installed Windows codec: HEIC / HEIF, AVIF, JPEG XR and
-  camera RAW (DNG, CR2, CR3, NEF, ARW, ...).
+  camera RAW (DNG, CR2, CR3, NEF, ARW, ...). HEIC / HEIF and AVIF also open through ffmpeg
+  when Windows has no codec for them (or on Linux).
 - **Comics and books:** CBZ / ZIP, CBR / RAR, CB7 / 7Z, CBT / TAR, EPUB (picture books and comics,
   in the book's own page order), PDF (Windows).
-- **Videos:** anything ffmpeg plays (MP4, MKV, WebM, MOV, AVI, WMV, ...), with sound. Needs
-  ffmpeg on the PATH (Windows: `winget install ffmpeg`). Videos sit in the folder between the
-  pictures and get a poster frame as their thumbnail.
+- **Videos:** anything ffmpeg plays (MP4, MKV, WebM, MOV, AVI, WMV, HEVC / H.265 including bare
+  `.hevc` / `.h265` streams, ...), with sound. Needs ffmpeg on the PATH (Windows:
+  `winget install ffmpeg`). Videos sit in the folder between the pictures and get their first
+  frame as the thumbnail.
 
 ## Viewing
 
@@ -22,8 +24,9 @@ page number, bookmark, fullscreen, settings and the ... menu. The view menu (its
 layout in use) has fit, webtoon strip, two pages, right to left, split wide pages, enlarge,
 zoom lock, thumbnails and the slideshow. Settings, Toolbar puts any of those back as a button.
 
-- **Next / previous:** arrows, A / D, PgUp / PgDn, mouse back / forward, the wheel, or click the
-  left / right third of the picture. The thin bar at the bottom jumps anywhere (click or drag).
+- **Next / previous:** arrows, A / D, PgUp / PgDn, mouse back / forward, or click the
+  left / right third of the picture. The wheel zooms around the cursor (Settings, Viewing can make
+  it scroll and turn pages instead; on a video it always zooms). The thin bar at the bottom jumps anywhere (click or drag).
 - **Fit and zoom:** F fits the window, W fits the width, E enlarges small images. The zoom
   slider and percentage sit in the toolbar (click the percentage for actual size and back);
   Ctrl+wheel or + / − zoom too, 1 is actual size.
@@ -34,8 +37,9 @@ zoom lock, thumbnails and the slideshow. Settings, Toolbar puts any of those bac
 - **Info panel:** size, format, file date, and for photos the camera, lens, exposure, date taken
   and GPS location from the EXIF.
 - **Animations** (GIF, APNG, WebP): K pauses, `,` and `.` step frame by frame.
-- **Videos:** play on their own. Space or K (or a click in the middle) plays / pauses, `,` and
-  `.` jump 5 seconds, and the bar along the bottom (shown while the mouse moves or it's paused)
+- **Videos:** play on their own; the ones either side are opened ahead, so moving to them starts
+  at once (loading dots while one still starts). Space or K (or a click in the middle) plays /
+  pauses, `,` and `.` jump 5 seconds, and the bar along the bottom (shown while the mouse moves or it's paused)
   has the seek bar, mute and volume.
 - **Thumbnails** (N, or the view menu): every picture in the folder in a strip that slides out
   when the mouse touches its edge. The pin in its corner keeps it on screen; drag the panel to
@@ -64,7 +68,8 @@ H shows every shortcut. Every one of them can be changed in Settings.
 - **Bookmarks:** B bookmarks the page (a tick on the page bar, the button fills in). The
   bookmark button's right-click menu, the ... menu, and the start screen list them.
 - **Bookmark files:** bookmarking a page (B, the button, or Ctrl+B for just the file) also asks
-  where to save it as a small `.tvmark` file; the dialog starts where the last one went. Double-click it, open it or drop it on the window
+  where to save it as a small `.tvmark` file; the dialog starts where the last one went.
+  Cancelling it leaves the page unbookmarked. Double-click it, open it or drop it on the window
   to carry on from that page.
 - **Split wide pages** (J): a double-page scan is read a half at a time, in reading order.
 - **Go to page:** G, or click the page counter.
@@ -74,8 +79,8 @@ H shows every shortcut. Every one of them can be changed in Settings.
 The sliders button in the toolbar (or Ctrl+,) opens Settings: the sections down the left, the
 chosen one on the right.
 
-- **Viewing:** fit, zoom step, enlarge small images, zoom lock, mouse wheel zooms instead of
-  turning, click zones, arrow keys look around a zoomed-in image first, sharp pixels.
+- **Viewing:** fit, zoom step, enlarge small images, zoom lock, mouse wheel turns pages instead
+  of zooming, click zones, arrow keys look around a zoomed-in image first, sharp pixels.
 - **Folders and order:** what happens at the last image, reopening where you left off, sort order.
 - **Comics:** two pages, right to left, split wide pages.
 - **Thumbnails:** on or off, only at the edge, where, size, preview on the bottom bar.
@@ -101,12 +106,19 @@ Toolbar buttons carry names for screen readers.
 
 ## Default app
 
-- **Windows:** ... menu → Make default image viewer opens Default apps at TelescopeView; pick it
-  for each type there (Windows doesn't let an app make itself the default). Until
-  it's the default, a small card offers this at most once a week ("Don't ask again", or switch it
-  off in Settings, Window). It registers itself for "Open with" and for `.tvmark` bookmark files
-  on first start (current user only, no admin).
-- **Linux:** `install.sh` from the .tar.gz (or the .deb) adds the menu entry and "Open with" for
+... menu → Make default (or Settings, Window) opens a small card: tick what TelescopeView should
+open (Pictures, RAW photos, Videos, Comics), or "Pick formats…" to leave single formats, say
+PNG, to another app. Unticked types stay with whatever opens them now. Until it's the default,
+the same card comes up by itself at most once a week ("Don't ask again", or switch it off in
+Settings, Window).
+
+- **Windows:** doesn't let an app make itself the default, so Make default registers the ticked
+  types and opens Settings at TelescopeView's own Default apps page, which lists only those:
+  pick it for each type there. It registers itself for "Open with" and for `.tvmark` bookmark
+  files on first start (current user only, no admin).
+- **Linux:** Make default writes `~/.local/share/applications/telescopeview.desktop` and sets it
+  as the default for the ticked types with `xdg-mime` (needs xdg-utils; GNOME and KDE both
+  follow it). `install.sh` from the .tar.gz (or the .deb) adds the menu entry and "Open with" for
   images and comics.
 - **macOS:** open files from inside the app or drop them on the window. Finder's "Open With"
   isn't wired up yet (macOS hands the file over through an Apple Event the window library
