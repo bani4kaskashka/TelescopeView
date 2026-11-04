@@ -13,9 +13,11 @@ the shortcut list, and change any key in Settings, Shortcuts.
 - **Comics and books:** CBZ / ZIP, CBR / RAR, CB7 / 7Z, CBT / TAR, EPUB (picture books and comics,
   in the book's own page order), PDF (Windows).
 - **Videos:** anything ffmpeg plays (MP4, MKV, WebM, MOV, AVI, WMV, HEVC / H.265 including bare
-  `.hevc` / `.h265` streams, ...), with sound. Needs ffmpeg on the PATH (Windows:
-  `winget install ffmpeg`). Videos sit in the folder between the pictures and get their first
-  frame as the thumbnail.
+  `.hevc` / `.h265` streams, ...), with sound. The Windows and Linux downloads carry their own
+  ffmpeg (an LGPL build from BtbN/FFmpeg-Builds, in `ffmpeg/` next to the app), so nothing needs
+  installing; the .deb pulls in the distribution's ffmpeg. Otherwise (the Mac, a bare exe) it
+  uses an installed ffmpeg (`brew install ffmpeg`, `winget install ffmpeg`). Videos sit in the
+  folder between the pictures and get their first frame as the thumbnail.
 
 ## Viewing
 

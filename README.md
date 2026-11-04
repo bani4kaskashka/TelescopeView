@@ -66,7 +66,7 @@ See the **[user guide](docs/GUIDE.md)** for everything it does and every shortcu
 | **Images** | PNG, APNG, JPEG, WebP, GIF, BMP, TIFF, ICO, TGA, QOI, PNM, HDR, EXR, DDS, Farbfeld, JPEG XL, SVG, PSD |
 | **Windows extras** | Anything with an installed Windows codec: HEIC / HEIF, AVIF, JPEG XR and camera RAW (DNG, CR2, CR3, NEF, ARW and more) |
 | **Comics and books** | CBZ / ZIP, CBR / RAR, CB7 / 7Z, CBT / TAR, EPUB (picture books and comics), PDF (Windows) |
-| **Videos** | Anything ffmpeg plays: MP4, MKV, WebM, MOV, AVI, WMV and more (needs ffmpeg on the PATH) |
+| **Videos** | Anything ffmpeg plays: MP4, MKV, WebM, MOV, AVI, WMV and more, with sound (ffmpeg comes with the Windows and Linux downloads) |
 
 ## Download
 
@@ -75,12 +75,12 @@ Every release lists a SHA-256 checksum for each file in `SHA256SUMS.txt`.
 
 | Platform | File | Notes |
 |---|---|---|
-| **Windows 10 / 11** (x64) | `TelescopeView-<version>-windows-x64.zip` | Unzip anywhere and run `TelescopeView.exe`. No installer, no admin rights. |
-| **macOS** (Apple silicon and Intel) | `TelescopeView-<version>-macos.dmg` | Not notarized yet: the first time, right-click the app and choose **Open**. |
-| **Linux** (x86_64) | `.tar.gz` or `.deb` | Run `install.sh` from the `.tar.gz` for the menu entry and "Open with". |
+| **Windows 10 / 11** (x64) | `TelescopeView-<version>-windows-x64.zip` | Unzip anywhere and run `TelescopeView.exe`. No installer, no admin rights. ffmpeg for videos is included. |
+| **macOS** (Apple silicon and Intel) | `TelescopeView-<version>-macos.dmg` | Not notarized yet: the first time, right-click the app and choose **Open**. For videos, `brew install ffmpeg`. |
+| **Linux** (x86_64) | `.tar.gz` or `.deb` | The `.tar.gz` includes ffmpeg; run its `install.sh` for the menu entry and "Open with". The `.deb` uses your distribution's ffmpeg. |
 
-For videos, install ffmpeg as well (Windows: `winget install ffmpeg`, macOS: `brew install ffmpeg`,
-Linux: your package manager).
+The Windows and Linux downloads are larger (about 73 MB for Windows) because they carry a
+portable ffmpeg, so videos play with nothing else to install.
 
 ## Quick start
 
@@ -162,3 +162,9 @@ in TelescopeView is dual-licensed as above, without any additional terms or cond
 CBR / RAR support uses the [UnRAR](https://www.rarlab.com/rar_add.htm) library, which comes under
 its own license (free to use for extracting, not for creating RAR archives). Build with
 `--no-default-features` to leave it out.
+
+The Windows and Linux downloads include [FFmpeg](https://ffmpeg.org) (an LGPL build from
+[BtbN/FFmpeg-Builds](https://github.com/BtbN/FFmpeg-Builds)) in their `ffmpeg/` folder.
+TelescopeView runs it as a separate program for video playback. FFmpeg is licensed under the
+GNU LGPL 2.1 or later; its license text is in `ffmpeg/LICENSE.txt`, and its source code is
+available at <https://ffmpeg.org/download.html>.

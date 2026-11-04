@@ -18,7 +18,7 @@ The first release.
 - Fullscreen, slideshow, info panel with EXIF (camera, lens, exposure, date taken, GPS).
 - Thumbnail panel that slides out from any edge, or stays pinned, or floats.
 - Animated GIF, APNG and WebP with pause and frame stepping.
-- Videos with sound through ffmpeg.
+- Videos with sound through ffmpeg, which comes with the Windows and Linux downloads.
 
 ### Comics, manga and webtoons
 - CBZ, CBR, CB7, CBT, EPUB and (Windows) PDF.
