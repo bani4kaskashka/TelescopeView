@@ -66,21 +66,25 @@ See the **[user guide](docs/GUIDE.md)** for everything it does and every shortcu
 | **Images** | PNG, APNG, JPEG, WebP, GIF, BMP, TIFF, ICO, TGA, QOI, PNM, HDR, EXR, DDS, Farbfeld, JPEG XL, SVG, PSD |
 | **Windows extras** | Anything with an installed Windows codec: HEIC / HEIF, AVIF, JPEG XR and camera RAW (DNG, CR2, CR3, NEF, ARW and more) |
 | **Comics and books** | CBZ / ZIP, CBR / RAR, CB7 / 7Z, CBT / TAR, EPUB (picture books and comics), PDF (Windows) |
-| **Videos** | Anything ffmpeg plays: MP4, MKV, WebM, MOV, AVI, WMV and more, with sound (ffmpeg comes with the Windows and Linux downloads) |
+| **Videos** | Anything ffmpeg plays: MP4, MKV, WebM, MOV, AVI, WMV and more, with sound (ffmpeg comes with the Windows downloads and the Linux `.zip`) |
 
 ## Download
 
 Get the latest build from the **[Releases page](https://github.com/bani4kaskashka/TelescopeView/releases/latest)**.
-Every release lists a SHA-256 checksum for each file in `SHA256SUMS.txt`.
+Every build comes for both x64 (Intel / AMD) and ARM64, as an installer or as a portable app.
 
-| Platform | File | Notes |
+| Platform | Installer | Portable |
 |---|---|---|
-| **Windows 10 / 11** (x64) | `TelescopeView-<version>-windows-x64.zip` | Unzip anywhere and run `TelescopeView.exe`. No installer, no admin rights. ffmpeg for videos is included. |
-| **macOS** (Apple silicon and Intel) | `TelescopeView-<version>-macos.dmg` | Not notarized yet: the first time, right-click the app and choose **Open**. For videos, `brew install ffmpeg`. |
-| **Linux** (x86_64) | `.tar.gz` or `.deb` | The `.tar.gz` includes ffmpeg; run its `install.sh` for the menu entry and "Open with". The `.deb` uses your distribution's ffmpeg. |
+| **Windows 10 / 11** | `TelescopeView-<version>-windows-x64-setup.exe`<br>`TelescopeView-<version>-windows-arm64-setup.exe`<br>Installs for your user only (no admin), adds a Start menu entry and an uninstaller. | `TelescopeView-<version>-windows-x64.zip`<br>`TelescopeView-<version>-windows-arm64.zip`<br>Unzip anywhere and run `TelescopeView.exe`. |
+| **macOS** (one app for Apple silicon and Intel) | `TelescopeView-<version>-macos-universal.dmg`<br>Drag the app onto Applications. | `TelescopeView-<version>-macos-universal.zip`<br>Just the app. |
+| **Linux** | `telescopeview_<version>_amd64.deb`<br>`telescopeview_<version>_arm64.deb` | `TelescopeView-<version>-linux-x64.zip`<br>`TelescopeView-<version>-linux-arm64.zip`<br>Run `telescopeview`, or `./install.sh` for a menu entry (`./uninstall.sh` removes it). |
 
-The Windows and Linux downloads are larger (about 73 MB for Windows) because they carry a
-portable ffmpeg, so videos play with nothing else to install.
+- **Videos work out of the box** on Windows and Linux: the installers and zips carry a portable
+  ffmpeg, which is why the Windows download is about 73 MB. The `.deb` uses your distribution's
+  ffmpeg. On a Mac, install it once with `brew install ffmpeg`.
+- **Not code-signed yet.** On Windows, SmartScreen asks once: choose **More info**, then
+  **Run anyway**. On a Mac, right-click the app and choose **Open** the first time.
+- **Checksums.** Every release lists the SHA-256 checksum of each file in `SHA256SUMS.txt`.
 
 ## Quick start
 
@@ -109,7 +113,7 @@ that opens it now.
   Settings, where you pick it for each type (Windows doesn't let apps set themselves as the
   default). It also registers for "Open with" on first start, for the current user only.
 - **Linux:** **Make default** sets it as the default for the ticked types through `xdg-mime`.
-  `install.sh` from the `.tar.gz` (or the `.deb`) adds the menu entry and "Open with".
+  `install.sh` from the `.zip` (or the `.deb`) adds the menu entry and "Open with".
 - **macOS:** open files from inside the app or drop them on the window. Finder's "Open With"
   is not supported yet.
 
@@ -128,9 +132,10 @@ support, and without the C++ compiler, use `cargo build --release --no-default-f
 
 | Platform | Package | Command |
 |---|---|---|
-| macOS | `.app` and `.dmg` (universal) | `sh packaging/build-macos.sh` |
-| Linux | `.tar.gz` and `.deb` | `sh packaging/build-linux.sh` (needs `libxkbcommon-dev libgl1-mesa-dev libasound2-dev`) |
-| All three | GitHub release | Push a `v*` tag. [`build.yml`](.github/workflows/build.yml) builds and publishes them. |
+| Windows | installer and `.zip` | `packaging/build-windows.ps1 -Arch x64` (or `arm64`); the installer needs [Inno Setup 6](https://jrsoftware.org/isinfo.php) |
+| macOS | `.dmg` and `.zip` (universal) | `sh packaging/build-macos.sh` on a Mac |
+| Linux | `.zip` and `.deb` | `sh packaging/build-linux.sh` (needs `libxkbcommon-dev libgl1-mesa-dev libasound2-dev`); for ARM64 set `TARGET=aarch64-unknown-linux-gnu` (built through [`cross`](https://github.com/cross-rs/cross)) |
+| Everything | GitHub release | Push a `v*` tag. [`build.yml`](.github/workflows/build.yml) builds all of the above and publishes them. |
 
 See [CONTRIBUTING.md](CONTRIBUTING.md) for the project layout and how to send changes.
 
@@ -146,8 +151,9 @@ See [CONTRIBUTING.md](CONTRIBUTING.md) for the project layout and how to send ch
 
 - PDF pages need Windows (TelescopeView uses the PDF reader built into Windows).
 - EPUB: picture books and comics only. Text-only novels have no pages to show.
-- The macOS and Linux builds compile and package in CI but haven't been tested on real
-  hardware yet. Reports are very welcome.
+- Only the Windows x64 build has been tested on real hardware so far. The ARM64, macOS and
+  Linux builds are made on GitHub's build machines and haven't been tried on a real device yet.
+  Reports are very welcome.
 
 ## License
 
@@ -163,7 +169,7 @@ CBR / RAR support uses the [UnRAR](https://www.rarlab.com/rar_add.htm) library, 
 its own license (free to use for extracting, not for creating RAR archives). Build with
 `--no-default-features` to leave it out.
 
-The Windows and Linux downloads include [FFmpeg](https://ffmpeg.org) (an LGPL build from
+The Windows downloads and the Linux `.zip` files include [FFmpeg](https://ffmpeg.org) (an LGPL build from
 [BtbN/FFmpeg-Builds](https://github.com/BtbN/FFmpeg-Builds)) in their `ffmpeg/` folder.
 TelescopeView runs it as a separate program for video playback. FFmpeg is licensed under the
 GNU LGPL 2.1 or later; its license text is in `ffmpeg/LICENSE.txt`, and its source code is

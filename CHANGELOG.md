@@ -18,7 +18,7 @@ The first release.
 - Fullscreen, slideshow, info panel with EXIF (camera, lens, exposure, date taken, GPS).
 - Thumbnail panel that slides out from any edge, or stays pinned, or floats.
 - Animated GIF, APNG and WebP with pause and frame stepping.
-- Videos with sound through ffmpeg, which comes with the Windows and Linux downloads.
+- Videos with sound through ffmpeg, which comes with the Windows downloads and the Linux `.zip`.
 
 ### Comics, manga and webtoons
 - CBZ, CBR, CB7, CBT, EPUB and (Windows) PDF.
@@ -30,6 +30,12 @@ The first release.
 - PNG, APNG, JPEG, WebP, GIF, BMP, TIFF, ICO, TGA, QOI, PNM, HDR, EXR, DDS, Farbfeld,
   JPEG XL, SVG and PSD everywhere.
 - On Windows, HEIC / HEIF, AVIF, JPEG XR and camera RAW through the installed Windows codecs.
+
+### Downloads
+- Windows installers (per user, no admin, with an uninstaller) and portable zips, for x64 and ARM64.
+- macOS: one universal app for Apple silicon and Intel, as a `.dmg` and a `.zip`.
+- Linux: portable zips with `install.sh` / `uninstall.sh`, and `.deb` packages, for x64 and ARM64.
+- `SHA256SUMS.txt` with every release.
 
 ### Interface
 - Flat, square, minimal look with dark, light and high-contrast themes.

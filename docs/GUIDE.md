@@ -117,18 +117,40 @@ Settings, Window).
 - **Windows:** doesn't let an app make itself the default, so Make default registers the ticked
   types and opens Settings at TelescopeView's own Default apps page, which lists only those:
   pick it for each type there. It registers itself for "Open with" and for `.tvmark` bookmark
-  files on first start (current user only, no admin).
+  files on first start, or straight away from the installer (current user only, no admin);
+  uninstalling takes that back out. By hand: `TelescopeView.exe --register` / `--unregister`.
 - **Linux:** Make default writes `~/.local/share/applications/telescopeview.desktop` and sets it
   as the default for the ticked types with `xdg-mime` (needs xdg-utils; GNOME and KDE both
-  follow it). `install.sh` from the .tar.gz (or the .deb) adds the menu entry and "Open with" for
-  images and comics.
+  follow it). `install.sh` from the .zip (or the .deb) adds the menu entry and "Open with" for
+  pictures, videos and comics.
 - **macOS:** open files from inside the app or drop them on the window. Finder's "Open With"
   isn't wired up yet (macOS hands the file over through an Apple Event the window library
   doesn't pass on).
+
+## Downloads
+
+Every release has, for Intel/AMD (x64) and ARM64 alike:
+
+| | Install | Portable |
+|---|---|---|
+| **Windows** | `-windows-x64-setup.exe` / `-windows-arm64-setup.exe`: installs for the current user (no admin), Start menu entry, uninstaller | `-windows-x64.zip` / `-windows-arm64.zip`: unzip anywhere and run `TelescopeView.exe` |
+| **macOS** | `-macos-universal.dmg`: drag the app onto Applications (one app for Apple silicon and Intel) | `-macos-universal.zip`: just the app |
+| **Linux** | `telescopeview_<version>_amd64.deb` / `_arm64.deb` | `-linux-x64.zip` / `-linux-arm64.zip`: run `telescopeview`, or `./install.sh` for a menu entry (`./uninstall.sh` removes it) |
+
+The Windows and Linux downloads (not the .deb) carry their own ffmpeg for videos. The Windows
+installer and the Mac app aren't signed with a paid certificate yet: Windows SmartScreen asks
+"Run anyway" once, and on a Mac right-click the app and pick Open the first time. Each release
+also lists the SHA-256 checksum of every file in `SHA256SUMS.txt`.
+
+Building them yourself: `packaging/build-windows.ps1 -Arch x64|arm64` (installer with Inno
+Setup 6), `sh packaging/build-linux.sh` (`TARGET=aarch64-unknown-linux-gnu` for ARM64, through
+`cross`), `sh packaging/build-macos.sh` on a Mac. `.github/workflows/build.yml` runs all of them.
 
 ## Known limits
 
 - PDF pages need Windows (it uses the PDF reader built into Windows).
 - EPUB: picture books and comics only. Text-only novels have no pages to show.
 - macOS: Finder's "Open With" (see above). On a Mac, Cmd+Backspace deletes.
-- The Mac and Linux builds compile but haven't been tried on a real Mac or Linux PC yet.
+- The Mac, Linux and Windows ARM64 builds compile but haven't been tried on a real Mac, Linux
+  PC or ARM64 Windows PC yet.
+- Videos on the Mac need ffmpeg from Homebrew (`brew install ffmpeg`).
