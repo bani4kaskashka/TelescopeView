@@ -1,7 +1,7 @@
 #!/bin/sh
 # Builds the Linux downloads for one architecture:
 #   TelescopeView-<version>-linux-<x64|arm64>.zip  (unzip anywhere and run, or ./install.sh)
-#   telescopeview_<version>_<amd64|arm64>.deb      (with cargo-deb installed)
+#   telescopeview_<version>-1_<amd64|arm64>.deb    (with cargo-deb installed)
 #
 #   sh packaging/build-linux.sh                                     # this machine's architecture
 #   TARGET=aarch64-unknown-linux-gnu sh packaging/build-linux.sh    # ARM64 (through `cross`)

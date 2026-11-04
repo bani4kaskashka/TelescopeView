@@ -135,7 +135,7 @@ Every release has, for Intel/AMD (x64) and ARM64 alike:
 |---|---|---|
 | **Windows** | `-windows-x64-setup.exe` / `-windows-arm64-setup.exe`: installs for the current user (no admin), Start menu entry, uninstaller | `-windows-x64.zip` / `-windows-arm64.zip`: unzip anywhere and run `TelescopeView.exe` |
 | **macOS** | `-macos-universal.dmg`: drag the app onto Applications (one app for Apple silicon and Intel) | `-macos-universal.zip`: just the app |
-| **Linux** | `telescopeview_<version>_amd64.deb` / `_arm64.deb` | `-linux-x64.zip` / `-linux-arm64.zip`: run `telescopeview`, or `./install.sh` for a menu entry (`./uninstall.sh` removes it) |
+| **Linux** | `telescopeview_<version>-1_amd64.deb` / `_arm64.deb` | `-linux-x64.zip` / `-linux-arm64.zip`: run `telescopeview`, or `./install.sh` for a menu entry (`./uninstall.sh` removes it) |
 
 The Windows and Linux downloads (not the .deb) carry their own ffmpeg for videos. The Windows
 installer and the Mac app aren't signed with a paid certificate yet: Windows SmartScreen asks

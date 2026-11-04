@@ -77,7 +77,7 @@ Every build comes for both x64 (Intel / AMD) and ARM64, as an installer or as a 
 |---|---|---|
 | **Windows 10 / 11** | `TelescopeView-<version>-windows-x64-setup.exe`<br>`TelescopeView-<version>-windows-arm64-setup.exe`<br>Installs for your user only (no admin), adds a Start menu entry and an uninstaller. | `TelescopeView-<version>-windows-x64.zip`<br>`TelescopeView-<version>-windows-arm64.zip`<br>Unzip anywhere and run `TelescopeView.exe`. |
 | **macOS** (one app for Apple silicon and Intel) | `TelescopeView-<version>-macos-universal.dmg`<br>Drag the app onto Applications. | `TelescopeView-<version>-macos-universal.zip`<br>Just the app. |
-| **Linux** | `telescopeview_<version>_amd64.deb`<br>`telescopeview_<version>_arm64.deb` | `TelescopeView-<version>-linux-x64.zip`<br>`TelescopeView-<version>-linux-arm64.zip`<br>Run `telescopeview`, or `./install.sh` for a menu entry (`./uninstall.sh` removes it). |
+| **Linux** | `telescopeview_<version>-1_amd64.deb`<br>`telescopeview_<version>-1_arm64.deb` | `TelescopeView-<version>-linux-x64.zip`<br>`TelescopeView-<version>-linux-arm64.zip`<br>Run `telescopeview`, or `./install.sh` for a menu entry (`./uninstall.sh` removes it). |
 
 - **Videos work out of the box** on Windows and Linux: the installers and zips carry a portable
   ffmpeg, which is why the Windows download is about 73 MB. The `.deb` uses your distribution's
