@@ -23,6 +23,10 @@ if [ -n "$target" ]; then
     if [ "$arch" = "$(uname -m)" ]; then
         cargo build --release --target "$target"
     else
+        # See Cross.toml: the build image's old GCC needs this for the bundled UnRAR.
+        if [ "$target" = aarch64-unknown-linux-gnu ]; then
+            export CXXFLAGS_aarch64_unknown_linux_gnu="${CXXFLAGS_aarch64_unknown_linux_gnu:--include cstddef}"
+        fi
         cross build --release --target "$target"
     fi
     bin="target/$target/release/TelescopeView"

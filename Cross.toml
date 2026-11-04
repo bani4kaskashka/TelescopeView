@@ -5,3 +5,9 @@ pre-build = [
     "dpkg --add-architecture $CROSS_DEB_ARCH",
     "apt-get update && apt-get install --assume-yes pkg-config libasound2-dev:$CROSS_DEB_ARCH",
 ]
+
+# The image's GCC 5 doesn't find ptrdiff_t in the bundled UnRAR (CBR support) on its own;
+# build-linux.sh sets this to "-include cstddef". The old image is kept on purpose: its
+# older glibc lets the ARM64 build run on older distributions.
+[target.aarch64-unknown-linux-gnu.env]
+passthrough = ["CXXFLAGS_aarch64_unknown_linux_gnu"]
