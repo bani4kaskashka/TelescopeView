@@ -6,6 +6,11 @@ All notable changes to TelescopeView are listed here. The format follows
 
 ## [Unreleased]
 
+## [0.1.1]
+
+### Fixed
+- Windows: no more blank white window for a moment when TelescopeView reopens maximized.
+
 ## [0.1.0]
 
 The first release.
@@ -44,5 +49,6 @@ The first release.
 - One window: files opened while TelescopeView is running show up in the open window.
 - Windows "Open with" and Default apps registration, for the current user only.
 
-[Unreleased]: https://github.com/bani4kaskashka/TelescopeView/compare/v0.1.0...HEAD
+[Unreleased]: https://github.com/bani4kaskashka/TelescopeView/compare/v0.1.1...HEAD
+[0.1.1]: https://github.com/bani4kaskashka/TelescopeView/compare/v0.1.0...v0.1.1
 [0.1.0]: https://github.com/bani4kaskashka/TelescopeView/releases/tag/v0.1.0
