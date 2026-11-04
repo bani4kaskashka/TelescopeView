@@ -1,0 +1,11 @@
+[Desktop Entry]
+Type=Application
+Name=TelescopeView
+GenericName=Gallery Viewer
+Comment=The fastest gallery viewer
+Exec=telescopeview %f
+Icon=telescopeview
+Terminal=false
+Categories=Graphics;Viewer;2DGraphics;
+Keywords=image;picture;photo;video;gallery;comic;manga;webtoon;cbz;
+MimeType=image/png;image/apng;image/jpeg;image/gif;image/webp;image/bmp;image/tiff;image/x-icon;image/vnd.microsoft.icon;image/x-tga;image/x-portable-anymap;image/x-portable-bitmap;image/x-portable-graymap;image/x-portable-pixmap;image/vnd.radiance;image/x-exr;image/x-dds;image/jxl;image/svg+xml;image/vnd.adobe.photoshop;image/qoi;application/vnd.comicbook+zip;application/x-cbz;application/vnd.comicbook-rar;application/x-cbr;application/x-cb7;application/x-cbt;application/epub+zip;image/heif;image/avif;video/mp4;video/x-m4v;video/x-matroska;video/webm;video/quicktime;video/x-msvideo;video/x-ms-wmv;video/x-flv;video/mpeg;video/mp2t;video/3gpp;video/ogg;

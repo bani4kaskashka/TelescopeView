@@ -1,0 +1,75 @@
+[package]
+name = "telescope-view"
+version = "0.1.0"
+edition = "2024"
+description = "The fastest gallery viewer: pictures, videos, comics, manga and webtoons"
+license = "MIT OR Apache-2.0"
+repository = "https://github.com/bani4kaskashka/TelescopeView"
+homepage = "https://github.com/bani4kaskashka/TelescopeView"
+readme = "README.md"
+keywords = ["image-viewer", "comic-reader", "manga", "webtoon", "egui"]
+categories = ["multimedia::images", "gui"]
+
+[[bin]]
+name = "TelescopeView"
+path = "src/main.rs"
+
+[dependencies]
+eframe = { version = "0.36.2", features = ["glow", "persistence"] }
+image = { version = "0.25.10", default-features = false, features = ["png", "jpeg", "webp", "gif", "bmp", "tiff", "ico", "tga", "qoi", "pnm", "hdr", "exr", "dds", "ff"] }
+rfd = "0.17.2"
+bytemuck = "1.25"
+resvg = "0.45"
+arboard = "3.7"
+serde = { version = "1", features = ["derive"] }
+jxl-oxide = { version = "0.12", features = ["image"] }
+psd = "0.3"
+sevenz-rust2 = "0.24"
+tar = "0.4"
+unrar = { version = "0.5", optional = true }
+kamadak-exif = "0.6"
+zip = { version = "2", default-features = false, features = ["deflate", "deflate64", "lzma"] }
+cpal = "0.18.2"
+
+[target.'cfg(windows)'.dependencies]
+raw-window-handle = "0.6"
+winreg = "0.55"
+windows = { version = "0.62", features = ["Graphics_Imaging", "Win32_Graphics_Imaging", "Win32_System_Com", "Win32_Foundation", "Win32_UI_Shell", "Win32_UI_WindowsAndMessaging", "Win32_Graphics_Dwm", "Win32_System_Registry", "Data_Pdf", "Storage", "Storage_Streams", "Foundation", "System_UserProfile"] }
+
+# Delete goes to the Trash / the desktop's trash folder.
+[target.'cfg(not(windows))'.dependencies]
+trash = "5"
+
+[features]
+default = ["rar"]
+# CBR / RAR support builds the unrar C++ library, so it needs a C++ compiler.
+rar = ["dep:unrar"]
+
+[profile.release]
+opt-level = 3
+lto = "thin"
+strip = true
+
+# Image decoding is painfully slow unoptimized, so debug builds still optimize dependencies.
+[profile.dev.package."*"]
+opt-level = 3
+
+[build-dependencies]
+winresource = "0.1"
+
+# Linux .deb (cargo deb).
+[package.metadata.deb]
+name = "telescopeview"
+maintainer = "TelescopeView"
+section = "graphics"
+# Spelled out (not "$auto") so the ARM64 package can be built on an x64 machine too. The
+# window libraries are loaded at run time; ffmpeg plays the videos.
+depends = "libc6 (>= 2.35), libgcc-s1, libstdc++6, libasound2 | libasound2t64, libgl1, libxkbcommon0, ffmpeg"
+assets = [
+    ["target/release/TelescopeView", "usr/bin/telescopeview", "755"],
+    ["packaging/linux/telescopeview.desktop", "usr/share/applications/", "644"],
+    ["packaging/icons/256.png", "usr/share/icons/hicolor/256x256/apps/telescopeview.png", "644"],
+    ["packaging/icons/128.png", "usr/share/icons/hicolor/128x128/apps/telescopeview.png", "644"],
+    ["packaging/icons/64.png", "usr/share/icons/hicolor/64x64/apps/telescopeview.png", "644"],
+    ["packaging/icons/32.png", "usr/share/icons/hicolor/32x32/apps/telescopeview.png", "644"],
+]

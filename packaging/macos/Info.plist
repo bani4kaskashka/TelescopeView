@@ -1,0 +1,33 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+    <key>CFBundleName</key>
+    <string>TelescopeView</string>
+    <key>CFBundleDisplayName</key>
+    <string>TelescopeView</string>
+    <key>CFBundleIdentifier</key>
+    <string>app.telescopeview</string>
+    <key>CFBundleExecutable</key>
+    <string>TelescopeView</string>
+    <key>CFBundleIconFile</key>
+    <string>AppIcon</string>
+    <key>CFBundlePackageType</key>
+    <string>APPL</string>
+    <key>CFBundleVersion</key>
+    <string>VERSION</string>
+    <key>CFBundleShortVersionString</key>
+    <string>VERSION</string>
+    <key>CFBundleInfoDictionaryVersion</key>
+    <string>6.0</string>
+    <key>LSMinimumSystemVersion</key>
+    <string>11.0</string>
+    <key>LSApplicationCategoryType</key>
+    <string>public.app-category.graphics-design</string>
+    <key>NSHighResolutionCapable</key>
+    <true/>
+    <!-- No CFBundleDocumentTypes yet: Finder hands files to an app through an Apple Event,
+         which winit doesn't pass on, so "Open With" would start the app without the file.
+         Open files from inside the app or drop them on the window. -->
+</dict>
+</plist>
