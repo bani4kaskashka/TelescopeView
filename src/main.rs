@@ -33,6 +33,24 @@ fn main() -> eframe::Result {
     migrate_settings();
     // Show up in "Open with" and Default apps. Done off the UI thread; it's a few registry writes.
     std::thread::spawn(system::register_if_needed);
+    // A PC without a real graphics driver (a virtual machine, say) has no OpenGL 2, so if the
+    // first way of drawing doesn't start, try the other one.
+    let first = renderer();
+    let second = if first == eframe::Renderer::Glow { eframe::Renderer::Wgpu } else { eframe::Renderer::Glow };
+    let result = run(first, initial.clone()).or_else(|error| run(second, initial).map_err(|_| error));
+    // There's no console to show this on, so without this the app would just not appear.
+    if let Err(error) = &result {
+        let name = app::APP_NAME;
+        rfd::MessageDialog::new()
+            .set_level(rfd::MessageLevel::Error)
+            .set_title(name)
+            .set_description(format!("{name} couldn't open its window. It needs a working graphics driver.\n\n{error}"))
+            .show();
+    }
+    result
+}
+
+fn run(renderer: eframe::Renderer, initial: Option<PathBuf>) -> eframe::Result {
     // A window coming back maximized (or full screen) from last time: winit maximizes a new
     // window with ShowWindow, which puts it on screen even though eframe asks for it hidden, a
     // blank white window before the app can cloak it. So it's made plain here and maximized
@@ -58,7 +76,7 @@ fn main() -> eframe::Result {
             .with_min_inner_size([480.0, 320.0])
             .with_drag_and_drop(true)
             .with_icon(std::sync::Arc::new(theme::app_icon())),
-        renderer: renderer(),
+        renderer,
         window_builder,
         ..Default::default()
     };

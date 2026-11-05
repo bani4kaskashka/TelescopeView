@@ -6,6 +6,12 @@ All notable changes to TelescopeView are listed here. The format follows
 
 ## [Unreleased]
 
+## [0.1.3]
+
+### Fixed
+- TelescopeView now opens on a PC without OpenGL 2, like a virtual machine with no graphics driver,
+  by switching to its other way of drawing. If neither works, it says so instead of closing silently.
+
 ## [0.1.2]
 
 ### Fixed
@@ -55,7 +61,8 @@ The first release.
 - One window: files opened while TelescopeView is running show up in the open window.
 - Windows "Open with" and Default apps registration, for the current user only.
 
-[Unreleased]: https://github.com/bani4kaskashka/TelescopeView/compare/v0.1.2...HEAD
+[Unreleased]: https://github.com/bani4kaskashka/TelescopeView/compare/v0.1.3...HEAD
+[0.1.3]: https://github.com/bani4kaskashka/TelescopeView/compare/v0.1.2...v0.1.3
 [0.1.2]: https://github.com/bani4kaskashka/TelescopeView/compare/v0.1.1...v0.1.2
 [0.1.1]: https://github.com/bani4kaskashka/TelescopeView/compare/v0.1.0...v0.1.1
 [0.1.0]: https://github.com/bani4kaskashka/TelescopeView/releases/tag/v0.1.0
