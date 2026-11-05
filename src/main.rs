@@ -18,6 +18,8 @@ use eframe::egui;
 use std::path::PathBuf;
 
 fn main() -> eframe::Result {
+    // wgpu only logs why it failed, and winget's validation reads stderr.
+    env_logger::Builder::from_env(env_logger::Env::default().default_filter_or("error")).init();
     // "Open with", a double-clicked file, dragging onto the exe, or `TelescopeView <file|folder>`.
     let initial = std::env::args_os().nth(1).map(PathBuf::from);
     // `--register` / `--unregister` from the installer: done, without a window.
@@ -82,11 +84,27 @@ fn run(renderer: eframe::Renderer, initial: Option<PathBuf>) -> eframe::Result {
         window_builder,
         ..Default::default()
     };
-    eframe::run_native(
-        app::APP_NAME,
-        options,
-        Box::new(move |cc| Ok(Box::new(app::App::new(cc, initial, restore.get())))),
-    )
+    let started = std::rc::Rc::new(std::cell::Cell::new(false));
+    let app_started = started.clone();
+    // wgpu panics instead of returning an error when it can't draw to the window. Only for
+    // startup: a crash once the app is running must not reopen it.
+    std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| {
+        eframe::run_native(
+            app::APP_NAME,
+            options,
+            Box::new(move |cc| {
+                app_started.set(true);
+                Ok(Box::new(app::App::new(cc, initial, restore.get())))
+            }),
+        )
+    }))
+    .unwrap_or_else(|panic| {
+        if started.get() {
+            std::panic::resume_unwind(panic);
+        }
+        let message = panic.downcast_ref::<String>().map(String::as_str).or(panic.downcast_ref::<&str>().copied());
+        Err(eframe::Error::AppCreation(message.unwrap_or("it crashed").into()))
+    })
 }
 
 /// Settings and reading history from before the rename.
