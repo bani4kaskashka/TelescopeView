@@ -46,6 +46,14 @@ Copy-Item "$src/bin/ffmpeg.exe", "$src/bin/ffprobe.exe", "$src/bin/*.dll" "$pkg/
 Copy-Item "$src/LICENSE.txt" "$pkg/ffmpeg/LICENSE.txt"
 Set-Content "$pkg/ffmpeg/README.txt" "FFmpeg ($zip, LGPL 2.1 or later), from https://github.com/BtbN/FFmpeg-Builds. Source code: https://ffmpeg.org/download.html"
 
+# A clean Windows has no C++ runtime, and this PC or the CI machine does, so running it here
+# wouldn't show the problem. Read what each file needs instead.
+$dumpbin = & "${env:ProgramFiles(x86)}\Microsoft Visual Studio\Installer\vswhere.exe" -latest -products * -find "VC/Tools/MSVC/**/bin/Hostx64/x64/dumpbin.exe" | Select-Object -First 1
+if (-not $dumpbin) { throw "dumpbin not found" }
+Get-ChildItem $pkg -Recurse -Include *.exe, *.dll | ForEach-Object {
+    if ((& $dumpbin -nologo -dependents $_.FullName) -match '(?i)^\s*(msvc[pr]|vcruntime)\S*\.dll') { throw "$($_.Name) needs the C++ runtime" }
+}
+
 $name = "TelescopeView-$version-windows-$Arch"
 Compress-Archive -Path $pkg -DestinationPath "$out/$name.zip" -Force
 Write-Host "Built $out/$name.zip"
