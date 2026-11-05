@@ -36,6 +36,17 @@ jobs:
       - name: Build the zip and the installer
         shell: pwsh
         run: ./packaging/build-windows.ps1 -Arch ${{ matrix.arch }}
+      # The tests don't open a window. Checks the title, as the "couldn't open" box also keeps it running.
+      - name: Check the window opens
+        if: matrix.arch == 'x64'
+        shell: pwsh
+        run: |
+          $p = Start-Process target/x86_64-pc-windows-msvc/release/TelescopeView.exe -ArgumentList docs/images/banner.png -PassThru
+          Start-Sleep 15
+          $p.Refresh()
+          "window title: '$($p.MainWindowTitle)'"
+          if ($p.MainWindowTitle -notlike 'banner.png*') { throw "the window didn't open" }
+          $p | Stop-Process
       - uses: actions/upload-artifact@v4
         with:
           name: windows-${{ matrix.arch }}

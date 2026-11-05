@@ -37,17 +37,19 @@ fn main() -> eframe::Result {
     // first way of drawing doesn't start, try the other one.
     let first = renderer();
     let second = if first == eframe::Renderer::Glow { eframe::Renderer::Wgpu } else { eframe::Renderer::Glow };
-    let result = run(first, initial.clone()).or_else(|error| run(second, initial).map_err(|_| error));
-    // There's no console to show this on, so without this the app would just not appear.
-    if let Err(error) = &result {
-        let name = app::APP_NAME;
-        rfd::MessageDialog::new()
-            .set_level(rfd::MessageLevel::Error)
-            .set_title(name)
-            .set_description(format!("{name} couldn't open its window. It needs a working graphics driver.\n\n{error}"))
-            .show();
-    }
-    result
+    run(first, initial.clone()).or_else(|first_error| {
+        run(second, initial).inspect_err(|second_error| {
+            // There's no console to show this on, so without this the app would just not appear.
+            let name = app::APP_NAME;
+            rfd::MessageDialog::new()
+                .set_level(rfd::MessageLevel::Error)
+                .set_title(name)
+                .set_description(format!(
+                    "{name} couldn't open its window. It needs a working graphics driver.\n\n{first_error}\n{second_error}"
+                ))
+                .show();
+        })
+    })
 }
 
 fn run(renderer: eframe::Renderer, initial: Option<PathBuf>) -> eframe::Result {
