@@ -1,0 +1,4 @@
+# Build the C++ runtime into the exe. Otherwise TelescopeView needs MSVCP140.dll and
+# VCRUNTIME140.dll, which a clean Windows install doesn't have.
+[target.'cfg(all(windows, target_env = "msvc"))']
+rustflags = ["-C", "target-feature=+crt-static"]
