@@ -11,9 +11,9 @@
 </p>
 
 <p align="center">
-  <b>The fastest gallery viewer.</b> Pictures, videos, comics, manga, webtoons,<br>
-  and the formats other viewers won't open.<br>
-  The next picture is already decoded before you ask for it, so flipping through a folder never flickers or waits.
+  <b>Pictures, videos and comics. One fast app for all of it.</b><br>
+  Open the formats other apps won't. Edit and crop pictures, save frames from videos,<br>
+  clear out duplicates, and read comics, manga and webtoons, all in one window.
 </p>
 
 <p align="center">
@@ -27,17 +27,19 @@
 
 ## Why TelescopeView
 
-Most viewers start decoding a picture when you ask for it, so every step shows a blank frame,
-a blurry preview or a spinner. TelescopeView works ahead of you:
+Most viewers make you wait for each picture, then send you to another program to do anything with
+it. TelescopeView works ahead of you, and keeps the tools where you already are:
 
 - **Preloading in the background.** A pool of decoder threads keeps the pictures around the
   current one ready, and looks further ahead when you flip fast. The current picture stays on
-  screen until the next one is fully ready, so nothing ever flashes.
+  screen until the next one is fully ready, so flipping through a folder doesn't flicker or wait.
 - **Instant, measured.** With 24-megapixel JPEGs on a Ryzen 7 5700X, every step was instant at
   6, 15 and 30 pictures per second. Set `IV_STATS=1` to log it on your own machine.
-- **One viewer for the whole folder.** Photos, camera RAW, HEIC, JPEG XL, EXR, DDS, PSD, SVG,
+- **One app for the whole folder.** Photos, camera RAW, HEIC, JPEG XL, EXR, DDS, PSD, SVG,
   videos and comic archives all sit in the same gallery, so you never switch apps halfway
   through a folder.
+- **The tools are right there.** Fix a photo, crop it, save a frame from a video or clear out
+  duplicates without opening a second program.
 - **Light on the system.** One GPU upload per frame at most, and zero CPU use while idle.
 - **Out of the way.** A flat, square, minimal interface with dark, light and high-contrast
   themes. The toolbar keeps to the everyday buttons; everything else lives one click away.
@@ -46,7 +48,10 @@ a blurry preview or a spinner. TelescopeView works ahead of you:
 
 | | |
 |---|---|
-| **Viewing** | Fit to window or width, zoom, zoom lock for comparing shots, enlarge small images, rotate and flip (saved losslessly into JPEGs), fullscreen, slideshow |
+| **Viewing** | Fit to window or width, zoom, zoom lock for comparing shots, enlarge small images, rotate and flip (saved losslessly into JPEGs), fullscreen, slideshow, an optional glide between images |
+| **Picture editor** | Dials for light balance, brightness, exposure, contrast, highlights, shadows, saturation, tint, temperature, sharpness, definition and straighten. Crop with free, original or fixed ratios, undo and redo, and a before/after line to drag. EXIF and the color profile are kept |
+| **Find duplicates** | Scan a folder for exact copies and look-alikes, then go through them in pairs. Nothing is deleted until you confirm on the last page, and then it goes to the Recycle Bin |
+| **Pick a frame** | Split a video into every frame as a grid and save any of them at full resolution as PNG or JPEG. It never overwrites a file |
 | **Comics and manga** | Two-page spreads (cover alone, wide scans alone), right-to-left reading, split wide pages, chapter-to-chapter reading, go to page |
 | **Webtoons** | Turn a folder into one long vertical strip, with adjustable column width and auto-scroll |
 | **Bookmarks** | Bookmark any page, see it on the page bar, and save it as a `.tvmark` file that reopens right there |
@@ -58,6 +63,8 @@ a blurry preview or a spinner. TelescopeView works ahead of you:
 | **Your way** | Every shortcut can be changed, every toolbar button shown or hidden, interface size from 100 to 200% |
 
 See the **[user guide](docs/GUIDE.md)** for everything it does and every shortcut.
+
+TelescopeView keeps growing, and more tools are on the way. Image upscaling is coming soon.
 
 ## Supported formats
 
@@ -72,6 +79,9 @@ See the **[user guide](docs/GUIDE.md)** for everything it does and every shortcu
 
 Get the latest build from the **[Releases page](https://github.com/bani4kaskashka/TelescopeView/releases/latest)**.
 Every build comes for both x64 (Intel / AMD) and ARM64, as an installer or as a portable app.
+
+The picture editor, Find duplicates and Pick a frame aren't in a release yet. They come with the
+next one, or [build from source](#building-from-source) to try them now.
 
 | Platform | Installer | Portable |
 |---|---|---|
@@ -100,8 +110,10 @@ Open a picture (double-click, drag it onto the window, or Ctrl+O) and use the ar
 | V | Webtoon strip | B | Bookmark the page |
 | P | Two-page spread | G | Go to page |
 | M | Right to left (manga) | H | Every shortcut |
+| Shift+E | Edit the picture | | |
 
-Settings are under the sliders button in the toolbar, or Ctrl+,.
+The pencil in the top bar opens the editor too. Find duplicates and Pick a frame are in the **...**
+menu. Settings are under the sliders button in the toolbar, or Ctrl+,.
 
 ## Making it your default viewer
 
@@ -151,6 +163,10 @@ See [CONTRIBUTING.md](CONTRIBUTING.md) for the project layout and how to send ch
 
 - PDF pages need Windows (TelescopeView uses the PDF reader built into Windows).
 - EPUB: picture books and comics only. Text-only novels have no pages to show.
+- The editor works on pictures, not animations or videos. To crop something from a video, save
+  the frame first. Saved files are 8-bit per channel, and pictures over 64 MP can only be saved as
+  a smaller copy.
+- Find duplicates doesn't find rotated or mirrored copies.
 - Only the Windows x64 build has been tested on real hardware so far. The ARM64, macOS and
   Linux builds are made on GitHub's build machines and haven't been tried on a real device yet.
   Reports are very welcome.
