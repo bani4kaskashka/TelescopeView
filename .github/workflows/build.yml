@@ -91,7 +91,7 @@ jobs:
             target/linux/*.deb
 
   macos:
-    runs-on: macos-14
+    runs-on: macos-latest
     env:
       RUSTUP_TOOLCHAIN: stable
     steps:
