@@ -206,6 +206,20 @@ fn has_alpha(img: &Image) -> bool {
         && img.frames.iter().any(|f| f.tiles.iter().any(|t| t.pixels.pixels.iter().any(|c| c.a() < 255)))
 }
 
+/// For the duplicate finder: the first frame as one picture of at most `side` pixels. The same
+/// way the thumbnails get theirs, as `decode`'s `max_side` only says where to cut it into tiles.
+pub fn decode_for_twins(path: &Path, side: u32) -> Result<crate::twins::Picture, String> {
+    let img = std::panic::catch_unwind(|| decode(path, 4096).map(|img| shrink(img, side)))
+        .unwrap_or_else(|_| Err("decoder crashed on this file".to_owned()))?;
+    let tile = &img.frames[0].tiles[0].pixels;
+    Ok(crate::twins::Picture {
+        width: tile.size[0] as u32,
+        height: tile.size[1] as u32,
+        rgba: tile.pixels.iter().flat_map(|c| c.to_srgba_unmultiplied()).collect(),
+        full_size: img.original_size,
+    })
+}
+
 pub fn decode(path: &Path, max_side: u32) -> Result<Image, String> {
     if let Some((archive, entry)) = files::archive_of(path)
         && files::ext_lower(archive) == "pdf"
@@ -552,6 +566,23 @@ mod tests {
             assert_eq!(size, [want.width() as usize, want.height() as usize], "{o:?}");
             assert_eq!(got, want_px, "{o:?}");
         }
+    }
+
+    /// Wide enough to come back from `decode` in tiles: the far corner has to be in the picture.
+    #[test]
+    fn twins_get_the_whole_picture_not_its_first_tile() {
+        let dir = std::env::temp_dir().join(format!("tv-twins-decode-{}", std::process::id()));
+        std::fs::create_dir_all(&dir).unwrap();
+        let path = dir.join("wide.png");
+        let img = RgbImage::from_fn(5000, 300, |x, _| Rgb(if x < 4500 { [0, 0, 0] } else { [255, 255, 255] }));
+        img.save(&path).unwrap();
+        let pic = decode_for_twins(&path, 256).unwrap();
+        std::fs::remove_dir_all(&dir).unwrap();
+        assert_eq!((pic.width, pic.height), (256, 15));
+        assert_eq!(pic.full_size, [5000, 300]);
+        assert_eq!(pic.rgba.len(), 256 * 15 * 4);
+        assert_eq!(&pic.rgba[..4], &[0, 0, 0, 255]);
+        assert_eq!(&pic.rgba[255 * 4..256 * 4], &[255, 255, 255, 255]);
     }
 
     #[test]

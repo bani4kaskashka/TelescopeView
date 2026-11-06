@@ -6,6 +6,27 @@ All notable changes to TelescopeView are listed here. The format follows
 
 ## [Unreleased]
 
+### Added
+- Picture editor: the pencil in the top bar, Shift+E or the ... menu opens it along the bottom. Dials
+  for light balance, brightness, exposure, contrast, highlights, shadows, saturation, tint,
+  temperature, sharpness, definition and straighten. Crop with free, original and fixed ratios,
+  rotate, flip, undo and redo, a before/after Compare line to drag, and Reset. Save replaces the file
+  and sends the original to the Recycle Bin; Save a copy writes a new one. EXIF and the color profile
+  are kept, and anything that would lose your changes asks first.
+- Find duplicates: the ... menu scans a folder for exact copies and look-alikes and shows them in
+  pairs to keep or delete. Nothing is deleted until you confirm on the last page, and it goes to the
+  Recycle Bin.
+- Pick a frame: on a video, the ... menu or a right-click splits it into every frame as a grid,
+  starting from where the video was. Save any frame at full resolution as PNG or JPEG. It never
+  overwrites a file.
+- Glide: an optional slide from one image to the next, with adjustable time. Off by default.
+- Side arrows: a small triangle on the side the mouse is on, black or white depending on what's
+  under it.
+- Find duplicates and Pick a frame can each get an optional toolbar button in Settings, Toolbar.
+
+### Changed
+- The bottom page bar is a little bigger and shows which image you're hovering sooner.
+
 ## [0.1.4]
 
 ### Fixed

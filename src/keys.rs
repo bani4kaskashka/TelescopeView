@@ -49,6 +49,7 @@ pub enum Action {
     SplitWide,
     ShowInFolder,
     SaveTurn,
+    Edit,
     Rename,
     Delete,
     Bookmark,
@@ -124,6 +125,7 @@ pub const DEFS: [Def; COUNT] = [
     def(A::SplitWide, "split_wide", "Split wide pages in two", &["J"]),
     def(A::ShowInFolder, "show_in_folder", "Show in folder", &["Ctrl+E"]),
     def(A::SaveTurn, "save_turn", "Save rotation / flip to the file", &["Ctrl+S"]),
+    def(A::Edit, "edit", "Edit the picture", &["Shift+E"]),
     def(A::Rename, "rename", "Rename", &["F2"]),
     // macOS has no Delete key on most keyboards; Cmd+Backspace is the Finder's "move to Trash".
     def(A::Delete, "delete", "Delete", if MAC { &["Delete", "Ctrl+Backspace"] } else { &["Delete"] }),

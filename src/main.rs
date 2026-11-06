@@ -3,13 +3,16 @@
 mod actions;
 mod app;
 mod canvas;
+mod edit;
 mod files;
+mod frames;
 mod instance;
 mod keys;
 mod loader;
 mod system;
 mod theme;
 mod thumbs;
+mod twins;
 mod ui;
 mod video;
 mod winimg;

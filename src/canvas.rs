@@ -1,7 +1,7 @@
 //! The image itself: fit modes, zoom, pan, rotation, animation, the mouse wheel, and the
 //! continuous vertical strip for webtoons.
 
-use crate::app::{App, Fit, Pic, Slot, is_fullscreen};
+use crate::app::{App, Drawn, Fit, Pic, Slot, compose, contrasting, is_fullscreen, shade_at};
 use crate::files;
 use crate::keys::Action;
 use crate::theme;
@@ -30,7 +30,8 @@ impl App {
         // Click zones: the outer thirds turn the page (mirrored for right to left), the middle
         // double-clicks to fullscreen. A double-click on a side is just two page turns.
         let zone = resp.interact_pointer_pos().map(|p| ((p.x - rect.left()) / rect.width() * 3.0).floor() as i32);
-        let side = self.settings.click_zones && !self.files.is_empty() && zone.is_some_and(|z| z != 1);
+        let editing = self.edit.is_some();
+        let side = !editing && self.settings.click_zones && !self.files.is_empty() && zone.is_some_and(|z| z != 1);
         if side && resp.clicked_by(PointerButton::Primary) {
             let towards_right = zone == Some(2);
             let forward = towards_right != (self.settings.rtl && !self.strip);
@@ -39,10 +40,12 @@ impl App {
             } else {
                 self.step(&ctx, if forward { 1 } else { -1 });
             }
-        } else if resp.double_clicked_by(PointerButton::Primary) {
+        } else if !editing && resp.double_clicked_by(PointerButton::Primary) {
             self.toggle_fullscreen(&ctx);
         }
-        resp.context_menu(|ui| self.actions_menu(ui));
+        if !editing {
+            resp.context_menu(|ui| self.actions_menu(ui));
+        }
         // A click on the middle of a video plays / pauses it.
         if self.video.is_some() && zone == Some(1) && resp.clicked_by(PointerButton::Primary) {
             self.toggle_pause();
@@ -51,14 +54,7 @@ impl App {
             self.video_controls(&ctx, rect);
         }
 
-        let bg = match self.settings.backdrop {
-            crate::app::Backdrop::Theme if is_fullscreen(&ctx) => theme::bg_fullscreen(),
-            crate::app::Backdrop::Theme => theme::bg(),
-            crate::app::Backdrop::Black => Color32::BLACK,
-            crate::app::Backdrop::Gray => Color32::from_gray(128),
-            crate::app::Backdrop::White => Color32::WHITE,
-        };
-        painter.rect_filled(rect, 0.0, bg);
+        painter.rect_filled(rect, 0.0, self.backdrop(&ctx));
         if is_fullscreen(&ctx) && !self.bars_visible(&ctx) {
             ctx.set_cursor_icon(egui::CursorIcon::None);
         }
@@ -85,7 +81,7 @@ impl App {
         });
         let wheel = resp.hovered() && (wheel_lines != 0.0 || wheel_points != 0.0);
 
-        if self.strip {
+        if self.strip && !editing {
             if wheel {
                 self.strip_pending -= wheel_lines * STRIP_WHEEL_STEP + wheel_points;
             }
@@ -97,7 +93,7 @@ impl App {
         // window and turns the page at its ends instead (a video always zooms);
         // a page that fits just turns. Ctrl+wheel (or a pinch) always zooms.
         let playing = self.current().is_some_and(|p| crate::video::is_video(p));
-        if wheel && (!self.settings.wheel_turns || playing) {
+        if wheel && (!self.settings.wheel_turns || playing || editing) {
             let step = self.settings.zoom_step.max(1.01);
             self.wheel_zoom *= step.powf(wheel_lines) * (wheel_points / 200.0 * step.ln() / 0.2).exp();
         } else if wheel {
@@ -125,6 +121,54 @@ impl App {
         self.page_view(&ctx, &resp, rect, &painter);
     }
 
+    /// What's behind the picture.
+    pub fn backdrop(&self, ctx: &egui::Context) -> Color32 {
+        match self.settings.backdrop {
+            crate::app::Backdrop::Theme if is_fullscreen(ctx) => theme::bg_fullscreen(),
+            crate::app::Backdrop::Theme => theme::bg(),
+            crate::app::Backdrop::Black => Color32::BLACK,
+            crate::app::Backdrop::Gray => Color32::from_gray(128),
+            crate::app::Backdrop::White => Color32::WHITE,
+        }
+    }
+
+    /// A small triangle on the side the mouse is on, when clicking there turns the page. It's
+    /// black or white, whichever shows up on what's under it.
+    fn side_arrow(&self, ctx: &egui::Context, resp: &egui::Response, rect: Rect, painter: &egui::Painter) {
+        let idle = self.last_activity.elapsed().as_secs_f32();
+        let wait = self.settings.bars_hide_secs;
+        let Some(p) = resp.hover_pos() else { return };
+        if !self.settings.click_zones || self.edit.is_some() || idle >= wait {
+            return;
+        }
+        ctx.request_repaint_after_secs(wait - idle);
+        let third = rect.width() / 3.0;
+        let right = p.x > rect.right() - third;
+        if !right && p.x > rect.left() + third {
+            return;
+        }
+        let forward = right != self.settings.rtl;
+        if !(if forward { self.index + 1 < self.files.len() } else { self.index > 0 }) {
+            return;
+        }
+        let side = if right { 1.0 } else { -1.0 };
+        let center = Pos2::new(if right { rect.right() } else { rect.left() } - side * 24.0, rect.center().y);
+        let tip = center + Vec2::new(side * 7.0, 0.0);
+        let back = center - Vec2::new(side * 7.0, 0.0);
+        let points = vec![tip, back + Vec2::new(0.0, 12.0), back - Vec2::new(0.0, 12.0)];
+        let color = contrasting(self.lightness_at(ctx, center));
+        painter.add(egui::Shape::convex_polygon(points, color, egui::Stroke::NONE));
+    }
+
+    /// How light (0..255) what's on screen is at `p`.
+    fn lightness_at(&self, ctx: &egui::Context, p: Pos2) -> f32 {
+        let back = crate::app::luma(self.backdrop(ctx));
+        let Some(d) = self.drawn.iter().find(|d| d.rect.contains(p) && d.clip.contains(p)) else { return back };
+        let undo_turn = (0..8).find(|&b| compose(d.turns, b) == 0).unwrap_or(0);
+        let at = Pos2::ZERO + (p - d.rect.min) / d.rect.size();
+        shade_at(&d.pic.shade, turn(at, undo_turn), back)
+    }
+
     /// One page at a time: fit page / fit width / free zoom.
     fn page_view(&mut self, ctx: &egui::Context, resp: &egui::Response, rect: Rect, painter: &egui::Painter) {
         let current = self.current().cloned();
@@ -149,12 +193,16 @@ impl App {
             return;
         };
         let (pic, since, shown_path) = (shown.pic.clone(), shown.since, shown.path.clone());
+        // Editing: the preview takes the page's place, already turned and sized like the result.
+        let edited = self.edit.as_ref().and_then(|e| e.pic());
+        let is_edited = edited.is_some();
+        let pic = edited.unwrap_or(pic);
         // Paused: the frame it stopped at (other pages of a spread keep playing).
         let paused = self.anim_pause;
 
         let ppp = self.ppp;
         let turns_of = |p: &std::path::PathBuf| self.rotation.get(p).copied().unwrap_or(0);
-        let quarter_turns = turns_of(&shown_path);
+        let quarter_turns = if is_edited { 0 } else { turns_of(&shown_path) };
         // 1.0 zoom = one image pixel per physical screen pixel (of the first page).
         let first = pic.size_turned(quarter_turns) / ppp;
         // A wide page split in two: only one half is laid out (and drawn, see below).
@@ -183,7 +231,8 @@ impl App {
             Fit::Width => rect.width() / natural.x,
         };
         let fit = if self.settings.enlarge_small { fit } else { fit.min(1.0) };
-        let mut zoom = self.zoom.unwrap_or(fit);
+        let floor = min_zoom(rect.size(), natural, fit);
+        let mut zoom = self.zoom.unwrap_or(fit).max(floor);
 
         let (mut factor, to_actual, to_fit) = self.zoom_keys(ctx);
         if to_fit {
@@ -210,7 +259,7 @@ impl App {
             zoom = 1.0;
             self.pan = Vec2::new(0.0, f32::INFINITY);
         } else if factor != 1.0 {
-            let new_zoom = (zoom * factor).clamp(MIN_ZOOM, MAX_ZOOM);
+            let new_zoom = (zoom * factor).clamp(floor, MAX_ZOOM);
             let center = rect.center() + self.pan;
             let offset = (center - anchor) * (new_zoom / zoom);
             self.pan = anchor + offset - rect.center();
@@ -218,7 +267,8 @@ impl App {
             zoom = new_zoom;
         }
 
-        if resp.dragged_by(PointerButton::Primary) || resp.dragged_by(PointerButton::Middle) {
+        let cropping = self.edit.as_ref().is_some_and(|e| e.cropping || e.comparing);
+        if (resp.dragged_by(PointerButton::Primary) && !cropping) || resp.dragged_by(PointerButton::Middle) {
             self.pan += resp.drag_delta();
         }
 
@@ -230,10 +280,30 @@ impl App {
         // Snap to whole physical pixels so 100% stays crisp.
         let min = rect.center() + self.pan - size * 0.5;
         let min = Pos2::new((min.x * ppp).round() / ppp, (min.y * ppp).round() / ppp);
+        // A glide: the old page leaves on one side as the new one comes in from the other.
+        let mut slide = Vec2::ZERO;
+        if let Some(g) = &self.glide {
+            let t = g.since.elapsed().as_secs_f32() / (self.settings.glide_ms.max(1) as f32 / 1000.0);
+            if t >= 1.0 {
+                self.glide = None;
+            } else {
+                let done = 1.0 - (1.0 - t).powi(3);
+                let dir = if g.forward != self.settings.rtl { 1.0 } else { -1.0 };
+                slide.x = dir * rect.width() * (1.0 - done);
+                let out = Vec2::new(-dir * rect.width() * done, 0.0);
+                for d in &g.from {
+                    let clipped = painter.with_clip_rect(d.clip.translate(out).intersect(painter.clip_rect()));
+                    draw_pic(&clipped, ctx, &d.pic, Duration::ZERO, d.rect.translate(out), d.turns, false);
+                }
+                ctx.request_repaint();
+            }
+        }
+        let mut drawn = Vec::new();
         let mut x = min.x;
         for (part, turns, part_size) in &parts {
             let w = size.x * part_size.x / natural.x;
-            let dest = Rect::from_min_size(Pos2::new(x, min.y), Vec2::new(w, size.y));
+            let rest = Rect::from_min_size(Pos2::new(x, min.y), Vec2::new(w, size.y));
+            let dest = rest.translate(slide);
             match part {
                 Some(p) => {
                     if p.has_alpha && self.settings.checker {
@@ -254,8 +324,28 @@ impl App {
                         );
                         let clipped = painter.with_clip_rect(dest.intersect(painter.clip_rect()));
                         draw_pic(&clipped, ctx, p, elapsed, whole, *turns, t.is_none());
+                        drawn.push(Drawn { pic: p.clone(), turns: *turns, rect: whole, clip: dest });
+                    } else if is_edited {
+                        // A crop is the whole picture slid and enlarged, clipped to the page.
+                        let clipped = painter.with_clip_rect(dest.intersect(painter.clip_rect()));
+                        draw_pic(&clipped, ctx, p, elapsed, dest, 0, false);
+                        // Comparing: the picture without the dials up to the line.
+                        if let Some(e) = &self.edit
+                            && let Some(before) = e.before_pic()
+                        {
+                            let left = Rect::from_min_max(dest.min, Pos2::new(e.line_x(dest), dest.bottom()));
+                            let clipped = painter.with_clip_rect(left.intersect(painter.clip_rect()));
+                            clipped.rect_filled(left, 0.0, self.backdrop(ctx));
+                            if p.has_alpha && self.settings.checker {
+                                let uv = Rect::from_min_size(Pos2::ZERO, dest.size() / 16.0);
+                                clipped.image(self.checker_tex.id(), dest, uv, Color32::WHITE);
+                            }
+                            draw_pic(&clipped, ctx, &before, elapsed, dest, 0, false);
+                        }
                     } else {
                         draw_pic(painter, ctx, p, elapsed, dest, *turns, t.is_none());
+                        // Where it is on screen (mid-glide too), so the next glide starts there.
+                        drawn.push(Drawn { pic: p.clone(), turns: *turns, rect: dest, clip: dest });
                         // A playing video draws its frames over the poster, turned the same way.
                         if Arc::ptr_eq(p, &pic)
                             && let Some(v) = &self.video
@@ -276,7 +366,16 @@ impl App {
             }
             x += w;
         }
+        self.drawn = drawn;
         self.effective_zoom = Some(zoom);
+        if let Some(e) = &mut self.edit {
+            if e.cropping {
+                e.crop_ui(resp, Rect::from_min_size(min, size), painter, ctx);
+            } else if e.comparing {
+                e.compare_ui(resp, Rect::from_min_size(min, size), painter, ctx);
+            }
+        }
+        self.side_arrow(ctx, resp, rect, painter);
 
         if slack != Vec2::ZERO && resp.hovered() && !(is_fullscreen(ctx) && !self.bars_visible(ctx)) {
             ctx.set_cursor_icon(if resp.dragged() { egui::CursorIcon::Grabbing } else { egui::CursorIcon::Grab });
@@ -297,6 +396,7 @@ impl App {
 
     /// Every page stacked in one column, scrolled continuously.
     fn strip_view(&mut self, ctx: &egui::Context, resp: &egui::Response, rect: Rect, painter: &egui::Painter) {
+        self.drawn.clear();
         // Width: Ctrl+wheel and + / - narrow or widen the column, 0 / 1 back to full width.
         let (factor, actual, fit) = self.zoom_keys(ctx);
         let reset = actual || fit;
@@ -389,6 +489,14 @@ impl App {
     }
 }
 
+/// How far out the zoom goes: half the window, or the size the picture fits at if that's
+/// smaller, so a small picture can't shrink to a dot. Never above its own size, so actual
+/// size (the 1 key) always works.
+fn min_zoom(view: Vec2, natural: Vec2, fit: f32) -> f32 {
+    let whole = (view.x / natural.x).min(view.y / natural.y);
+    (whole * 0.5).min(fit).min(1.0)
+}
+
 fn snap(p: Pos2, ppp: f32) -> Pos2 {
     Pos2::new((p.x * ppp).round() / ppp, (p.y * ppp).round() / ppp)
 }
@@ -436,7 +544,7 @@ fn draw_pic(
 
 /// A point of the image (0..1 coordinates) to where it lands after turning it clockwise
 /// (mirrored left to right first when bit 2 is set, see `app::compose`).
-fn turn(p: Pos2, quarter_turns: u8) -> Pos2 {
+pub fn turn(p: Pos2, quarter_turns: u8) -> Pos2 {
     let p = if quarter_turns & 4 != 0 { Pos2::new(1.0 - p.x, p.y) } else { p };
     match quarter_turns & 3 {
         1 => Pos2::new(1.0 - p.y, p.x),
@@ -479,6 +587,28 @@ mod tests {
         match tile_mesh(egui::TextureId::default(), tile, dest, turns) {
             egui::Shape::Mesh(m) => m.vertices.iter().map(|v| v.pos).collect(),
             _ => unreachable!(),
+        }
+    }
+
+    #[test]
+    fn zooming_out_stops_before_a_picture_gets_tiny() {
+        let view = Vec2::new(1000.0, 800.0);
+        // Big: half the window.
+        assert_eq!(min_zoom(view, Vec2::new(4000.0, 2000.0), 0.25), 0.125);
+        // Small, shown at its own size: no smaller than that.
+        assert_eq!(min_zoom(view, Vec2::new(50.0, 50.0), 1.0), 1.0);
+        // A long strip at fill width can still go out to half the window's height.
+        assert_eq!(min_zoom(view, Vec2::new(800.0, 16000.0), 1.25), 0.025);
+        // Small and enlarged to fit: actual size is still allowed.
+        assert_eq!(min_zoom(view, Vec2::new(50.0, 50.0), 16.0), 1.0);
+    }
+
+    #[test]
+    fn undoing_a_turn_finds_the_same_spot() {
+        let p = Pos2::new(0.2, 0.7);
+        for q in 0..8 {
+            let undo = (0..8).find(|&b| compose(q, b) == 0).unwrap();
+            assert!((turn(turn(p, q), undo) - p).length() < 1e-5, "{q}");
         }
     }
 

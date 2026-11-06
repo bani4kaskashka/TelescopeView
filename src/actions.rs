@@ -23,12 +23,20 @@ impl App {
 
     /// Drops a page from the list after it was deleted or moved away.
     fn forget_current(&mut self, ctx: &egui::Context) {
-        let Some(path) = self.current().cloned() else {
-            return;
-        };
-        self.cache.remove(&path);
-        self.rotation.remove(&path);
-        self.files.remove(self.index);
+        if let Some(path) = self.current().cloned() {
+            self.forget_files(ctx, std::slice::from_ref(&path));
+        }
+    }
+
+    /// Stays on the same picture, or on the one after it if that's among them.
+    pub fn forget_files(&mut self, ctx: &egui::Context, gone: &[PathBuf]) {
+        let gone: std::collections::HashSet<&PathBuf> = gone.iter().collect();
+        self.index -= self.files.iter().take(self.index).filter(|p| gone.contains(p)).count();
+        self.files.retain(|p| !gone.contains(p));
+        for path in gone {
+            self.cache.remove(path);
+            self.rotation.remove(path);
+        }
         if self.files.is_empty() {
             self.shown = None;
             self.dir = None;
@@ -233,7 +241,7 @@ fn wide(s: &std::ffi::OsStr) -> Vec<u16> {
 }
 
 #[cfg(windows)]
-fn recycle(path: &Path) -> Result<(), String> {
+pub(crate) fn recycle(path: &Path) -> Result<(), String> {
     use windows::Win32::UI::Shell::{FO_DELETE, FOF_ALLOWUNDO, FOF_WANTNUKEWARNING, SHFILEOPSTRUCTW, SHFileOperationW};
     // pFrom is a list of paths ending in an extra NUL.
     let mut from = wide(path.as_os_str());
@@ -287,7 +295,7 @@ fn set_wallpaper_file(file: &Path) -> Result<(), String> {
 
 /// To the Trash (macOS) or the desktop's trash folder (Linux).
 #[cfg(not(windows))]
-fn recycle(path: &Path) -> Result<(), String> {
+pub(crate) fn recycle(path: &Path) -> Result<(), String> {
     trash::delete(path).map_err(|e| e.to_string())
 }
 #[cfg(not(windows))]
@@ -361,13 +369,110 @@ fn rotate_file(path: &Path, turns: u8) -> Result<(), String> {
         }
         _ => return Err("this format can't be rotated here".into()),
     };
-    // Written next to it first, so a failure halfway never leaves a broken file.
+    write_beside(path, &out, false)
+}
+
+/// Written next to it first, so a failure halfway never leaves a broken file. With `keep_old`,
+/// what's there goes to the Recycle Bin once the new file is safely written.
+fn write_beside(path: &Path, bytes: &[u8], keep_old: bool) -> Result<(), String> {
     let tmp = path.with_extension("telescope-tmp");
-    std::fs::write(&tmp, &out).map_err(|e| e.to_string())?;
+    std::fs::write(&tmp, bytes).map_err(|e| e.to_string())?;
+    if keep_old && path.exists() {
+        let recycled = recycle(path);
+        // On a drive without a bin, Windows asks first: answering no leaves the file there.
+        if recycled.is_err() || path.exists() {
+            let _ = std::fs::remove_file(&tmp);
+            return Err(recycled.err().unwrap_or_else(|| "cancelled, nothing changed".to_owned()));
+        }
+    }
     std::fs::rename(&tmp, path).map_err(|e| {
+        // The original is in the bin by now: this file is the only copy of the edit, so it stays.
+        if keep_old {
+            return format!("{e}. The original is in the Recycle Bin, the edit is at {}", tmp.display());
+        }
         let _ = std::fs::remove_file(&tmp);
         e.to_string()
     })
+}
+
+/// Whether an edited picture can be written in the format this file's name says.
+pub fn can_write(path: &Path) -> bool {
+    use image::ImageFormat::*;
+    image::ImageFormat::from_path(path).is_ok_and(|f| matches!(f, Jpeg | Png | WebP | Bmp | Tiff | Qoi | Tga))
+}
+
+/// Writes an edited picture to `target`, keeping `source`'s color profile and EXIF where the
+/// format can hold them. Saved over `source`, the old file goes to the Recycle Bin.
+pub fn write_edited(img: image::RgbaImage, source: &Path, target: &Path) -> Result<(), String> {
+    use image::codecs::{jpeg::JpegEncoder, png::PngEncoder, webp::WebPEncoder};
+    if !can_write(target) {
+        return Err("use a name ending in .png, .jpg, .webp, .bmp or .tif".into());
+    }
+    let format = image::ImageFormat::from_path(target).map_err(|e| e.to_string())?;
+    let (icc, exif) = source_metadata(source);
+    let img = image::DynamicImage::ImageRgba8(img);
+    let mut out = std::io::Cursor::new(Vec::new());
+    let written = match format {
+        image::ImageFormat::Jpeg => encode(JpegEncoder::new_with_quality(&mut out, 95), img, icc, exif),
+        image::ImageFormat::Png => encode(PngEncoder::new(&mut out), img, icc, exif),
+        // Lossless, the only kind the image library writes: bigger, nothing lost.
+        image::ImageFormat::WebP => encode(WebPEncoder::new_lossless(&mut out), img, icc, exif),
+        _ => img.write_to(&mut out, format),
+    };
+    written.map_err(|e| e.to_string())?;
+    write_beside(target, &out.into_inner(), target == source)
+}
+
+fn encode(
+    mut encoder: impl image::ImageEncoder,
+    img: image::DynamicImage,
+    icc: Option<Vec<u8>>,
+    exif: Option<Vec<u8>>,
+) -> image::ImageResult<()> {
+    // Formats that can't hold one of these just go without.
+    if let Some(icc) = icc {
+        let _ = encoder.set_icc_profile(icc);
+    }
+    if let Some(exif) = exif {
+        let _ = encoder.set_exif_metadata(exif);
+    }
+    img.write_with_encoder(encoder)
+}
+
+/// The color profile and EXIF of a file, the EXIF made true for the edited picture.
+fn source_metadata(source: &Path) -> (Option<Vec<u8>>, Option<Vec<u8>>) {
+    use image::ImageDecoder;
+    let Ok(bytes) = files::read_page(source) else { return (None, None) };
+    let reader = image::ImageReader::new(std::io::Cursor::new(bytes)).with_guessed_format();
+    let Some(mut decoder) = reader.ok().and_then(|r| r.into_decoder().ok()) else { return (None, None) };
+    let icc = decoder.icc_profile().ok().flatten();
+    let exif = decoder.exif_metadata().ok().flatten().map(|mut exif| {
+        settle_exif(&mut exif);
+        exif
+    });
+    (icc, exif)
+}
+
+/// The pixels are saved the right way up, so the orientation goes back to normal, and the small
+/// preview in the EXIF (the next directory, IFD1) would still show the old picture, so it's cut off.
+fn settle_exif(tiff: &mut [u8]) {
+    let Some((offset, big_endian, _)) = find_orientation(tiff) else { return };
+    let one: u16 = 1;
+    tiff[offset..offset + 2].copy_from_slice(&if big_endian { one.to_be_bytes() } else { one.to_le_bytes() });
+    let read = |at: usize, n: usize| {
+        let b = tiff.get(at..at + n)?;
+        Some(
+            b.iter()
+                .enumerate()
+                .fold(0usize, |v, (k, &x)| v | (x as usize) << (8 * if big_endian { n - 1 - k } else { k })),
+        )
+    };
+    let next = read(4, 4).and_then(|ifd| Some(ifd + 2 + read(ifd, 2)? * 12));
+    if let Some(next) = next
+        && let Some(link) = tiff.get_mut(next..next + 4)
+    {
+        link.fill(0);
+    }
 }
 
 /// APNG and animated WebP: rotating would keep only the first frame.
@@ -474,6 +579,44 @@ mod tests {
         use image::ImageDecoder;
         let mut d = image::codecs::jpeg::JpegDecoder::new(std::io::Cursor::new(bytes)).unwrap();
         d.orientation().unwrap()
+    }
+
+    fn jpeg_with_exif(path: &Path, orientation: u8) {
+        // A TIFF header, an orientation entry, and a link on to a next directory.
+        let header = b"II*\0\x08\0\0\0\x01\0\x12\x01\x03\0\x01\0\0\0".as_slice();
+        let exif = [header, &[orientation, 0, 0, 0], &[42, 0, 0, 0]].concat();
+        let img = image::RgbImage::from_pixel(8, 4, image::Rgb([200, 100, 50]));
+        let mut out = std::fs::File::create(path).unwrap();
+        let mut enc = image::codecs::jpeg::JpegEncoder::new(&mut out);
+        image::ImageEncoder::set_exif_metadata(&mut enc, exif).unwrap();
+        enc.encode_image(&img).unwrap();
+    }
+
+    #[test]
+    fn saving_an_edit_keeps_exif_but_not_the_old_orientation() {
+        use image::ImageDecoder;
+        let dir = std::env::temp_dir().join(format!("telescope-edit-test-{}", std::process::id()));
+        std::fs::create_dir_all(&dir).unwrap();
+        let (source, copy) = (dir.join("a.jpg"), dir.join("a edited.png"));
+        jpeg_with_exif(&source, 6);
+        assert_eq!(orientation(&std::fs::read(&source).unwrap()), image::metadata::Orientation::Rotate90);
+
+        let edited = image::RgbaImage::from_pixel(3, 5, image::Rgba([1, 2, 3, 255]));
+        let jpeg_copy = dir.join("b.jpg");
+        write_edited(edited.clone(), &source, &jpeg_copy).unwrap();
+        let bytes = std::fs::read(&jpeg_copy).unwrap();
+        assert_eq!(orientation(&bytes), image::metadata::Orientation::NoTransforms, "pixels are upright now");
+        let mut d = image::codecs::jpeg::JpegDecoder::new(std::io::Cursor::new(&bytes)).unwrap();
+        let exif = d.exif_metadata().unwrap().expect("the EXIF came along");
+        assert_eq!(&exif[exif.len() - 4..], &[0, 0, 0, 0], "no stale preview left");
+        assert_eq!(d.dimensions(), (3, 5));
+
+        write_edited(edited.clone(), &source, &copy).unwrap();
+        assert_eq!(image::open(&copy).unwrap().to_rgba8(), edited, "lossless, pixel for pixel");
+        assert!(!dir.join("a edited.telescope-tmp").exists());
+        assert!(write_edited(edited, &source, &dir.join("a.xyz")).is_err());
+        assert!(source.exists(), "the source is only touched when saving over it");
+        let _ = std::fs::remove_dir_all(&dir);
     }
 
     #[test]

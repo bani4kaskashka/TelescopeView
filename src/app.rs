@@ -6,7 +6,7 @@ use crate::keys::{self, Action, Keymap};
 use crate::loader::{Image, Loader};
 use crate::system;
 use crate::theme::{self, Icons};
-use eframe::egui::{self, Key, PointerButton, Rect, TextureFilter, TextureHandle, TextureOptions, Vec2};
+use eframe::egui::{self, Color32, Key, PointerButton, Pos2, Rect, TextureFilter, TextureHandle, TextureOptions, Vec2};
 use serde::{Deserialize, Serialize};
 use std::collections::{BTreeMap, HashMap};
 use std::path::{Path, PathBuf};
@@ -34,6 +34,23 @@ pub struct Pic {
     pub original_size: [u32; 2],
     pub format: String,
     pub has_alpha: bool,
+    /// How light the first frame is, see `shade_of`. Empty: unknown.
+    pub shade: Vec<[u8; 2]>,
+}
+
+/// A page as drawn last frame: what a glide slides away.
+pub struct Drawn {
+    pub pic: Arc<Pic>,
+    pub turns: u8,
+    pub rect: Rect,
+    pub clip: Rect,
+}
+
+/// The old page sliding out and the new one in.
+pub struct Glide {
+    pub from: Vec<Drawn>,
+    pub since: Instant,
+    pub forward: bool,
 }
 
 pub struct PicFrame {
@@ -207,6 +224,12 @@ pub struct Settings {
     pub zoom_step: f32,
     /// The slideshow stops at the last image instead of starting over.
     pub slideshow_stops: bool,
+    /// Slide from one image to the next.
+    pub glide: bool,
+    pub glide_ms: u32,
+    /// Find duplicates: how alike two pictures have to be, 0.5..=1.0.
+    pub twins_threshold: f32,
+    pub twins_subfolders: bool,
 }
 
 /// What's behind the image.
@@ -329,6 +352,10 @@ impl Default for Settings {
             bars_hide_secs: 1.8,
             zoom_step: 1.25,
             slideshow_stops: false,
+            glide: false,
+            glide_ms: 300,
+            twins_threshold: crate::twins::DEFAULT_THRESHOLD,
+            twins_subfolders: false,
         }
     }
 }
@@ -358,6 +385,8 @@ pub struct App {
     decoded: HashMap<PathBuf, Image>,
     uploaded_in_frame: Option<u64>,
     pub shown: Option<Shown>,
+    pub drawn: Vec<Drawn>,
+    pub glide: Option<Glide>,
     /// None = follow the fit mode. Otherwise 1.0 = one image pixel per screen pixel.
     pub zoom: Option<f32>,
     pub pan: Vec2,
@@ -462,6 +491,14 @@ pub struct App {
     pub unrotate: Vec<PathBuf>,
     /// Messages from work done off the UI thread, shown as toasts.
     inbox: Arc<std::sync::Mutex<Vec<String>>>,
+    /// The picture being edited; the bars give way to the edit panel meanwhile.
+    pub edit: Option<crate::edit::Edit>,
+    /// Find duplicates, asking which folder: the folder box's text.
+    pub twins_ask: Option<String>,
+    /// Find duplicates, running: it takes over the whole window.
+    pub twins: Option<crate::twins::Panel>,
+    /// Pick a frame, over the whole window.
+    pub frames: Option<crate::frames::Picker>,
 }
 
 /// What the info panel reads from disk, once per page: size and dates, and a photo's EXIF.
@@ -500,6 +537,8 @@ impl App {
             decoded: HashMap::new(),
             uploaded_in_frame: None,
             shown: None,
+            drawn: Vec::new(),
+            glide: None,
             zoom: None,
             pan: Vec2::ZERO,
             enter_at_bottom: false,
@@ -564,6 +603,10 @@ impl App {
             max_side,
             unrotate: Vec::new(),
             inbox: Arc::default(),
+            edit: None,
+            twins_ask: None,
+            twins: None,
+            frames: None,
         };
         crate::instance::listen(cc.egui_ctx.clone(), app.take_launches.clone(), app.pending_open.clone());
         app.offer_default = Self::default_offer_due(&app.settings);
@@ -622,6 +665,12 @@ impl App {
 
     /// Returns false (and says why) if there was nothing to open.
     pub fn open_folder(&mut self, ctx: &egui::Context, dir: PathBuf, start: Start) -> bool {
+        if let Some(e) = &mut self.edit
+            && e.holds_leaving()
+        {
+            e.leave_then(crate::edit::Then::Open(dir, start));
+            return false;
+        }
         let mut files = match files::list_pages(&dir, self.settings.sort, self.settings.sort_desc) {
             Ok(f) => f,
             Err(e) => {
@@ -678,6 +727,7 @@ impl App {
             self.settings.spread = spread;
             self.settings.rtl = rtl;
         }
+        self.edit = None;
         self.forward = index + 1 < files.len() || files.len() == 1;
         self.files = files;
         self.dir = Some(dir);
@@ -759,7 +809,7 @@ impl App {
     }
 
     /// The folder dialogs start in: the open one (an archive's folder), or the last one read.
-    fn dialog_dir(&self) -> Option<PathBuf> {
+    pub fn dialog_dir(&self) -> Option<PathBuf> {
         let d = self.dir.clone().or_else(|| self.settings.history.first().map(|(d, _)| d.clone()))?;
         if d.is_dir() { Some(d) } else { d.parent().map(Path::to_path_buf) }
     }
@@ -932,7 +982,7 @@ impl App {
     // --- book mode ------------------------------------------------------------------------
 
     pub fn spread_on(&self) -> bool {
-        self.settings.spread && !self.strip
+        self.settings.spread && !self.strip && self.edit.is_none()
     }
 
     /// The page shown next to page `i` in a spread. The cover (first page) and wide pages
@@ -1489,6 +1539,11 @@ impl App {
             {
                 eprintln!("  ready after {:.0} ms", t.elapsed().as_secs_f64() * 1000.0);
             }
+            let glides = self.settings.glide && !self.settings.reduce_motion && !self.strip && self.edit.is_none();
+            if glides && self.shown.as_ref().is_some_and(|s| s.path != path) {
+                let from = std::mem::take(&mut self.drawn);
+                self.glide = Some(Glide { from, since: Instant::now(), forward: self.forward });
+            }
             self.shown = Some(Shown { path, pic, since: Instant::now() });
             self.anim_pause = None;
             // Locked: same zoom and the same spot, for comparing shots. Otherwise fit again.
@@ -1536,7 +1591,13 @@ impl App {
 
     fn handle_keys(&mut self, ctx: &egui::Context) {
         // A text box is open: its own keys only (Ctrl+C copies text there, not the image).
-        if self.renaming.is_some() || self.goto.is_some() {
+        // The duplicate finder and the frame picker have their own too.
+        if self.renaming.is_some()
+            || self.goto.is_some()
+            || self.twins_ask.is_some()
+            || self.twins.is_some()
+            || self.frames.is_some()
+        {
             return;
         }
         if let Some(path) = self.confirm_delete.clone() {
@@ -1551,6 +1612,10 @@ impl App {
         }
         if self.capturing.is_some() {
             self.capture_key(ctx);
+            return;
+        }
+        if self.edit.is_some() {
+            self.edit_keys(ctx);
             return;
         }
         // A focused button (Tab) would take arrows and Space instead of the page. The only text
@@ -1713,6 +1778,9 @@ impl App {
         if hit(Action::Pause) {
             self.toggle_pause();
         }
+        if hit(Action::Edit) {
+            self.start_edit(ctx, self.index);
+        }
         if hit(Action::Rename) {
             self.start_rename();
         }
@@ -1795,6 +1863,7 @@ impl App {
         self.settings.split_wide
             && !self.strip
             && !self.spread_on()
+            && self.edit.is_none()
             && self.ready(self.index).is_some_and(|p| {
                 let s = p.size_turned(self.current_rotation());
                 s.x > s.y * 1.05
@@ -1975,24 +2044,12 @@ impl App {
     pub fn show_in_explorer(&mut self) {
         let Some(p) = self.current() else { return };
         // A page inside an archive: point at the archive.
-        let target = files::archive_of(p).map_or_else(|| p.clone(), |(a, _)| a.to_path_buf());
-        #[cfg(windows)]
-        {
-            use std::os::windows::process::CommandExt;
-            // explorer wants `/select,"path"` as one raw argument; normal quoting breaks it.
-            let _ =
-                std::process::Command::new("explorer.exe").raw_arg(format!("/select,\"{}\"", target.display())).spawn();
-        }
-        #[cfg(target_os = "macos")]
-        let _ = std::process::Command::new("open").arg("-R").arg(&target).spawn();
-        #[cfg(all(unix, not(target_os = "macos")))]
-        if let Some(folder) = target.parent() {
-            let _ = std::process::Command::new("xdg-open").arg(folder).spawn();
-        }
+        reveal(&files::archive_of(p).map_or_else(|| p.clone(), |(a, _)| a.to_path_buf()));
     }
 
     pub fn bars_visible(&self, ctx: &egui::Context) -> bool {
         !is_fullscreen(ctx)
+            || self.edit.is_some()
             || self.settings.keep_bars
             || self.last_activity.elapsed().as_secs_f32() < self.settings.bars_hide_secs
             || egui::Popup::is_any_open(ctx)
@@ -2003,8 +2060,71 @@ impl App {
     }
 }
 
+/// Shows a file in the system's file manager.
+pub fn reveal(target: &Path) {
+    #[cfg(windows)]
+    {
+        use std::os::windows::process::CommandExt;
+        // explorer wants `/select,"path"` as one raw argument; normal quoting breaks it.
+        let _ = std::process::Command::new("explorer.exe").raw_arg(format!("/select,\"{}\"", target.display())).spawn();
+    }
+    #[cfg(target_os = "macos")]
+    let _ = std::process::Command::new("open").arg("-R").arg(target).spawn();
+    #[cfg(all(unix, not(target_os = "macos")))]
+    if let Some(folder) = target.parent() {
+        let _ = std::process::Command::new("xdg-open").arg(folder).spawn();
+    }
+}
+
+/// Cells across and down in a `Pic`'s shade grid.
+const SHADE_GRID: usize = 16;
+
+pub fn luma(c: Color32) -> f32 {
+    0.299 * c.r() as f32 + 0.587 * c.g() as f32 + 0.114 * c.b() as f32
+}
+
+/// A coarse map of a picture for choosing a color that shows up on it: each cell's brightness
+/// and opacity, sampled, so it costs next to nothing per picture.
+fn shade_of(tiles: &[crate::loader::Tile]) -> Vec<[u8; 2]> {
+    let mut grid = Vec::with_capacity(SHADE_GRID * SHADE_GRID);
+    for y in 0..SHADE_GRID {
+        for x in 0..SHADE_GRID {
+            let (mut light, mut alpha, mut n) = (0.0, 0.0, 0.0);
+            for (dx, dy) in [(0.25, 0.25), (0.75, 0.25), (0.5, 0.5), (0.25, 0.75), (0.75, 0.75)] {
+                let at = Pos2::new((x as f32 + dx) / SHADE_GRID as f32, (y as f32 + dy) / SHADE_GRID as f32);
+                if let Some(t) = tiles.iter().find(|t| t.rect.contains(at)) {
+                    let [w, h] = t.pixels.size;
+                    let px = (((at.x - t.rect.left()) / t.rect.width() * w as f32) as usize).min(w.saturating_sub(1));
+                    let py = (((at.y - t.rect.top()) / t.rect.height() * h as f32) as usize).min(h.saturating_sub(1));
+                    // An empty tile has nothing to say.
+                    let Some(&c) = t.pixels.pixels.get(py * w + px) else { continue };
+                    light += luma(c);
+                    alpha += c.a() as f32;
+                    n += 1.0;
+                }
+            }
+            grid.push([(light / f32::max(n, 1.0)) as u8, (alpha / f32::max(n, 1.0)) as u8]);
+        }
+    }
+    grid
+}
+
+/// How light (0..255) the picture is at `at` (0..1), over a background of lightness `back`.
+pub fn shade_at(grid: &[[u8; 2]], at: Pos2, back: f32) -> f32 {
+    let cell = |v: f32| ((v * SHADE_GRID as f32) as usize).min(SHADE_GRID - 1);
+    let Some([light, alpha]) = grid.get(cell(at.y) * SHADE_GRID + cell(at.x)) else { return back };
+    // The pixels are premultiplied: what's see-through shows the background.
+    *light as f32 + back * (1.0 - *alpha as f32 / 255.0)
+}
+
+/// Which one shows up on a background this light.
+pub fn contrasting(light: f32) -> Color32 {
+    if light > 128.0 { Color32::BLACK } else { Color32::WHITE }
+}
+
 /// Puts every tile of every frame on the GPU.
 fn upload(ctx: &egui::Context, path: &Path, img: Image, sharp: bool) -> Pic {
+    let shade = img.frames.first().map_or(Vec::new(), |f| shade_of(&f.tiles));
     let mut opts = TextureOptions::LINEAR.with_mipmap_mode(Some(TextureFilter::Linear));
     if sharp {
         // Mipmaps keep shrinking smooth; only enlarging shows hard pixels.
@@ -2025,7 +2145,7 @@ fn upload(ctx: &egui::Context, path: &Path, img: Image, sharp: bool) -> Pic {
             delay: frame.delay,
         })
         .collect();
-    Pic { frames, original_size: img.original_size, format: img.format, has_alpha: img.has_alpha }
+    Pic { frames, original_size: img.original_size, format: img.format, has_alpha: img.has_alpha, shade }
 }
 
 impl eframe::App for App {
@@ -2046,6 +2166,13 @@ impl eframe::App for App {
             self.reveal = Reveal::Done;
         }
 
+        if ctx.input(|i| i.viewport().close_requested())
+            && let Some(e) = &mut self.edit
+            && e.holds_leaving()
+        {
+            ctx.send_viewport_cmd(egui::ViewportCommand::CancelClose);
+            e.leave_then(crate::edit::Then::Close);
+        }
         let dropped: Option<PathBuf> = ctx
             .input(|i| i.raw.dropped_files.iter().map(|f| f.path().to_path_buf()).find(|p| !p.as_os_str().is_empty()));
         if let Some(p) = dropped {
@@ -2068,7 +2195,11 @@ impl eframe::App for App {
         self.take_launches.store(self.settings.single_instance, std::sync::atomic::Ordering::Relaxed);
         self.handle_keys(ctx);
         self.refresh_thumbs(ctx);
-        self.sync_video(ctx);
+        // Not under the frame picker: a video still starting would begin to play behind it.
+        if self.frames.is_none() {
+            self.sync_video(ctx);
+        }
+        self.pump_edit(ctx);
         // Back to the small window once the user stops flipping, freeing the far-ahead images.
         if self.fast {
             let idle = self.last_step.map_or(Duration::MAX, |t| t.elapsed());
@@ -2084,7 +2215,13 @@ impl eframe::App for App {
         let full = ctx.content_rect();
         let mut root = ui.new_child(egui::UiBuilder::new().max_rect(full));
         root.set_clip_rect(full);
-        self.draw(&mut root, ctx);
+        if self.twins.is_some() {
+            self.draw_twins(&mut root, ctx);
+        } else if self.frames.is_some() {
+            self.draw_frames(&mut root, ctx);
+        } else {
+            self.draw(&mut root, ctx);
+        }
         self.reveal_when_ready(ctx);
     }
 }
@@ -2251,6 +2388,36 @@ mod tests {
     use super::*;
 
     #[test]
+    fn the_arrow_color_shows_up_on_what_is_under_it() {
+        // White on the left half, black on the right, see-through along the bottom.
+        let (w, h) = (64, 64);
+        let pixels = (0..w * h)
+            .map(|i| match (i / w >= 48, i % w < 32) {
+                (true, _) => Color32::TRANSPARENT,
+                (false, true) => Color32::WHITE,
+                (false, false) => Color32::BLACK,
+            })
+            .collect();
+        let tile = crate::loader::Tile {
+            pixels: egui::ColorImage::new([w, h], pixels),
+            rect: Rect::from_min_max(Pos2::ZERO, Pos2::new(1.0, 1.0)),
+        };
+        let grid = shade_of(&[tile]);
+        let color = |x, y, back| contrasting(shade_at(&grid, Pos2::new(x, y), back));
+        assert_eq!(color(0.1, 0.3, 0.0), Color32::BLACK, "on white");
+        assert_eq!(color(0.9, 0.3, 255.0), Color32::WHITE, "on black, whatever the background");
+        assert_eq!(color(0.5, 0.9, 16.0), Color32::WHITE, "see-through on a dark background");
+        assert_eq!(color(0.5, 0.9, 255.0), Color32::BLACK, "see-through on a white background");
+        assert_eq!(contrasting(shade_at(&[], Pos2::ZERO, 255.0)), Color32::BLACK, "nothing known");
+        // Nothing to sample: no panic, and the background decides.
+        let full = Rect::from_min_max(Pos2::ZERO, Pos2::new(1.0, 1.0));
+        let empty = crate::loader::Tile { pixels: egui::ColorImage::new([0, 0], Vec::new()), rect: full };
+        let one = crate::loader::Tile { pixels: egui::ColorImage::filled([1, 1], Color32::WHITE), rect: full };
+        assert_eq!(shade_at(&shade_of(&[empty]), Pos2::new(0.5, 0.5), 40.0), 40.0);
+        assert_eq!(contrasting(shade_at(&shade_of(&[one]), Pos2::new(0.99, 0.99), 0.0)), Color32::BLACK);
+    }
+
+    #[test]
     fn mark_file_round_trip() {
         let b = Bookmark { dir: PathBuf::from(r"D:\Comics\Series = one\Ch 3"), page: "sub/012.jpg".into(), number: 12 };
         let back = read_mark(&mark_text(&b)).expect("reads back");
@@ -2272,7 +2439,13 @@ mod tests {
         let tex = ctx.load_texture("t", egui::ColorImage::filled([1, 1], egui::Color32::RED), Default::default());
         let frame = |ms| PicFrame { tiles: vec![(tex.clone(), Rect::ZERO)], delay: Duration::from_millis(ms) };
         let pic =
-            Pic { frames: vec![frame(100), frame(50)], original_size: [1, 1], format: String::new(), has_alpha: false };
+            Pic {
+                frames: vec![frame(100), frame(50)],
+                original_size: [1, 1],
+                format: String::new(),
+                has_alpha: false,
+                shade: Vec::new(),
+            };
         let at = |ms| {
             let (f, wait) = pic.frame_at(Duration::from_millis(ms));
             (f.delay.as_millis(), wait.unwrap().as_millis())

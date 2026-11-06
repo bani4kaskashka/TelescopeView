@@ -51,6 +51,34 @@ zoom lock, thumbnails and the slideshow. Settings, Toolbar puts any of those bac
 - **Files:** copy image / path / the file itself (Ctrl+Shift+F, pastes into Explorer), show in Explorer, rename (F2), delete to the Recycle Bin (Del),
   save the rotation or flip into the file (Ctrl+S, lossless for JPEG), copy / move to a folder, set as
   desktop background or (Windows) lock screen from the ... menu's "Set as", and on Windows Open with, Edit, Print and Properties.
+- **Editing:** the pencil in the top bar, Shift+E or the ... menu opens the editor along the
+  bottom. Drag a dial right or up to raise it, double-click to zero it, or click it and use the
+  arrow keys: light balance, brightness, exposure, contrast, highlights, shadows, saturation,
+  tint, temperature, sharpness, definition and straighten. A dial shows its icon, and its number
+  while hovered or just changed. The crop tool has free, original and fixed ratios (Enter or the
+  crop button applies it); there are also rotate, flip, undo / redo (Ctrl+Z, Ctrl+Y), Compare (a
+  line to drag over the picture, before on its left and after on its right) and Reset. Save
+  (Ctrl+S) replaces the file and sends the original to the Recycle Bin; Save a copy writes a new
+  one. Esc leaves the editor. Anything that would lose your changes (Esc, opening something else,
+  closing the window) asks first. EXIF and the color profile are kept.
+- **Find duplicates:** the ... menu asks for a folder (the open one to start with) and how alike
+  pictures have to be, then shows the look-alikes in pairs: left arrow keeps the left, right arrow
+  the right, down or Space both, Del deletes both, S keeps the rest of a set, Z undoes, Esc leaves.
+  The wheel zooms both pictures together, drag pans, double-click resets. Nothing is deleted until
+  "Move to Recycle Bin" on the last page. Exact copies always show; moving the slider never scans
+  again. Rotated or mirrored copies aren't found, and crops need a lower slider (about 75 for 3%
+  off each side). Settings, Toolbar can give it a button.
+- **Pick a frame:** on a video, the ... menu (or a right-click) splits it into every frame as a
+  grid, starting from where the video was. Arrows, Page Up/Down, Home and End move around, or
+  click or drag the slider. Enter or a double-click saves that frame at full resolution as PNG or
+  JPEG next to the video, or in a folder you choose, and never over another file. Ctrl+Shift+S
+  saves as, Stop keeps the frames so far, Esc closes. Long videos take memory while it's open,
+  roughly 10 MB per 1000 frames. Settings, Toolbar can give it a button.
+- **Glide:** Settings, Viewing can slide from one image to the next, with the time it takes
+  (off by default, and off with Reduce motion).
+- **Side arrows:** with click zones on, a small triangle shows on the side the mouse is on, black
+  or white depending on what's under it. It hides when the mouse rests.
+- **Position bar:** the tiny bookmarks above it are your bookmarked pages.
 - **Resume:** every folder reopens where you left it. If an external drive comes back under
   another letter, the saved places follow it.
 - **Paste** (Ctrl+V): opens a copied file or path, or a copied picture (saved as a PNG first).
@@ -154,3 +182,6 @@ Setup 6), `sh packaging/build-linux.sh` (`TARGET=aarch64-unknown-linux-gnu` for 
 - The Mac, Linux and Windows ARM64 builds compile but haven't been tried on a real Mac, Linux
   PC or ARM64 Windows PC yet.
 - Videos on the Mac need ffmpeg from Homebrew (`brew install ffmpeg`).
+- Editing: animations and videos can't be edited. Saved files are 8-bit per channel, WebP is
+  written lossless, and pictures over 64 MP load scaled down, so they can only be saved as a
+  smaller copy.

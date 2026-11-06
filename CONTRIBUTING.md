@@ -41,6 +41,9 @@ first build takes a while.
 | `src/files.rs` | Folder and archive listing, sorting, next / previous chapter |
 | `src/actions.rs` | File actions: delete, rename, copy / move, save rotation, set as wallpaper |
 | `src/video.rs` | Video playback through ffmpeg |
+| `src/edit.rs` | The picture editor |
+| `src/frames.rs` | Pick a frame: the frame grid for a video |
+| `src/twins/` | Find duplicates |
 | `src/winimg.rs` | Windows codecs (HEIC, AVIF, RAW, JPEG XR) and PDF pages |
 | `src/system.rs` | Windows "Open with" / Default apps registration |
 | `src/instance.rs` | One window: hands newly opened files to the running window |

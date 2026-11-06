@@ -17,15 +17,23 @@ const SHOW_IN_FOLDER: &str = if cfg!(windows) {
 } else {
     "Show in folder"
 };
-const PAGE_BAR_H: f32 = 16.0;
+const PAGE_BAR_H: f32 = 22.0;
 const TOAST_FOR: Duration = Duration::from_millis(2200);
 
 impl App {
     pub fn draw(&mut self, ui: &mut egui::Ui, ctx: &egui::Context) {
         let fullscreen = is_fullscreen(ctx);
         let has_pages = !self.files.is_empty();
+        let editing = self.edit.is_some();
 
-        if !fullscreen {
+        if editing {
+            egui::Panel::bottom("edit")
+                .exact_size(crate::edit::PANEL_H)
+                .show_separator_line(false)
+                .frame(egui::Frame::NONE.fill(self.backdrop(ctx)))
+                .show(ui, |ui| self.edit_panel(ui));
+        }
+        if !fullscreen && !editing {
             egui::Panel::top("top")
                 .exact_size(TOP_BAR_H)
                 .frame(egui::Frame::NONE.fill(theme::bar()).inner_margin(egui::Margin::symmetric(4, 0)))
@@ -39,18 +47,20 @@ impl App {
         }
         // Where the picture goes, between the bars: thumbnails dock to its edges.
         let mut area = ctx.content_rect();
-        if !fullscreen {
+        if !fullscreen && !editing {
             area.min.y += TOP_BAR_H;
             if has_pages && self.settings.show_page_bar {
                 area.max.y -= PAGE_BAR_H;
             }
         }
-        self.thumbs(ui, ctx, area);
+        if !editing {
+            self.thumbs(ui, ctx, area);
+        }
         egui::CentralPanel::default().frame(egui::Frame::NONE).show(ui, |ui| self.canvas(ui));
 
         // Fullscreen: the same bars float over the image and get out of the way when the
         // mouse rests, so they never resize the page under you.
-        if fullscreen && self.bars_visible(ctx) {
+        if fullscreen && !editing && self.bars_visible(ctx) {
             let screen = ctx.content_rect();
             egui::Area::new(egui::Id::new("top-overlay"))
                 .fixed_pos(screen.left_top())
@@ -103,6 +113,12 @@ impl App {
         }
         if self.confirm_delete.is_some() {
             self.confirm_delete_box(ctx);
+        }
+        if self.twins_ask.is_some() {
+            self.twins_box(ctx);
+        }
+        if self.edit.as_ref().is_some_and(|e| e.confirm_leave) {
+            self.confirm_leave_box(ctx);
         }
         if fullscreen && has_pages && self.settings.page_number_fullscreen && !self.bars_visible(ctx) {
             let text = format!("{} / {}", self.index + 1, self.files.len());
@@ -275,6 +291,14 @@ impl App {
                         self.toggle_fullscreen(&ctx);
                     }
                 }
+                if self.button_on("twins") && icon_button(ui, &self.icons.twins.clone(), "Find duplicates", false, true).clicked() {
+                    self.ask_twins();
+                }
+                if self.button_on("frames")
+                    && icon_button(ui, &self.icons.frames.clone(), "Pick a frame", false, self.frames_video().is_some()).clicked()
+                {
+                    self.open_frames(&ctx);
+                }
                 if self.button_on("info") {
                     let info = self.settings.show_info;
                     let tip = self.keymap.tip("Info", Action::Info);
@@ -292,6 +316,11 @@ impl App {
                         self.toggle_bookmark();
                     }
                     egui::Popup::context_menu(&bm).show(|ui| self.bookmarks_menu(ui));
+                }
+                let tip = self.keymap.tip("Edit the picture", Action::Edit);
+                let can_edit = self.can_edit(self.index);
+                if icon_button(ui, &self.icons.edit.clone(), &tip, false, can_edit).clicked() {
+                    self.start_edit(&ctx, self.index);
                 }
                 if has_pages {
                     if self.button_on("counter") {
@@ -416,7 +445,7 @@ impl App {
         let painter = ui.painter_at(rect);
         let y = rect.center().y;
         let hovered = resp.hovered() || resp.dragged();
-        let thickness = if hovered { 4.0 } else { 2.0 };
+        let thickness = if hovered { 6.0 } else { 3.0 };
         painter.rect_filled(
             Rect::from_x_y_ranges(track.x_range(), y - thickness / 2.0..=y + thickness / 2.0),
             0.0,
@@ -425,20 +454,20 @@ impl App {
         let (a, b) = if rtl { (x_of(self.index), track.right()) } else { (track.left(), x_of(self.index)) };
         let done = Rect::from_x_y_ranges(a..=b, y - thickness / 2.0..=y + thickness / 2.0);
         painter.rect_filled(done, 0.0, theme::progress());
-        // Bookmarked pages: a small tick above the line.
+        // Bookmarked pages: a tiny bookmark above the line.
+        let mut marked = Vec::new();
         if let Some(dir) = &self.dir {
             for bm in self.settings.bookmarks.iter().filter(|b| b.dir == *dir) {
                 if let Some(i) = self.files.iter().position(|f| files::relative_name(dir, f) == bm.page) {
-                    painter.rect_filled(
-                        Rect::from_center_size(Pos2::new(x_of(i), rect.top() + 3.0), Vec2::new(3.0, 5.0)),
-                        0.0,
-                        theme::text(),
-                    );
+                    let icon = Rect::from_center_size(Pos2::new(x_of(i), rect.top() + 4.5), Vec2::splat(9.0));
+                    let uv = Rect::from_min_max(Pos2::ZERO, Pos2::new(1.0, 1.0));
+                    painter.image(self.icons.bookmark_on.id(), icon, uv, theme::text());
+                    marked.push(i);
                 }
             }
         }
         painter.rect_filled(
-            Rect::from_center_size(Pos2::new(x_of(self.index), y), Vec2::new(4.0, 10.0)),
+            Rect::from_center_size(Pos2::new(x_of(self.index), y), Vec2::new(4.0, 12.0)),
             0.0,
             theme::text(),
         );
@@ -446,28 +475,31 @@ impl App {
         if let Some(p) = resp.hover_pos() {
             let i = index_at(p.x);
             painter.rect_filled(
-                Rect::from_center_size(Pos2::new(x_of(i), y), Vec2::new(2.0, 10.0)),
+                Rect::from_center_size(Pos2::new(x_of(i), y), Vec2::new(2.0, 12.0)),
                 0.0,
                 theme::text_dim(),
             );
-            let label = format!("{}  ·  {}", i + 1, files::file_name(&self.files[i]));
+            let mut label = format!("{}  ·  {}", i + 1, files::file_name(&self.files[i]));
+            if marked.contains(&i) {
+                label += "  ·  bookmarked";
+            }
+            let mut thumb = None;
             if self.settings.bar_preview {
                 // The page under the mouse, and its neighbours so sliding along finds them ready.
                 let near = (i.saturating_sub(3)..(i + 4).min(n)).map(|k| self.files[k].clone());
                 self.thumb_want.insert(0, self.files[i].clone());
                 self.thumb_want.extend(near);
-                let thumb = self.thumbs.get(&self.files[i]).cloned().flatten();
-                resp.on_hover_ui_at_pointer(|ui| {
-                    if let Some(t) = &thumb {
-                        let size = t.size_vec2();
-                        let fit = (160.0 / size.x.max(1.0)).min(160.0 / size.y.max(1.0));
-                        ui.image((t.id(), size * fit));
-                    }
-                    ui.label(label);
-                });
-            } else {
-                resp.on_hover_text_at_pointer(label);
+                thumb = self.thumbs.get(&self.files[i]).cloned().flatten();
             }
+            // At once and while moving, not the usual tooltip that waits for the mouse to rest.
+            egui::Tooltip::for_widget(&resp).at_pointer().gap(12.0).show(|ui| {
+                if let Some(t) = &thumb {
+                    let size = t.size_vec2();
+                    let fit = (160.0 / size.x.max(1.0)).min(160.0 / size.y.max(1.0));
+                    ui.image((t.id(), size * fit));
+                }
+                ui.label(label);
+            });
         }
     }
 
@@ -861,6 +893,10 @@ impl App {
             });
             ui.separator();
             ui.menu_button("Rotate and flip", |ui| self.turn_menu(ui));
+            let can_edit = self.can_edit(self.index);
+            if ui.add_enabled(can_edit, menu_button("Edit the picture…", &self.keymap.text(Action::Edit))).clicked() {
+                self.start_edit(&ctx, self.index);
+            }
             if self.anim_state().is_some() {
                 let paused = self.anim_pause.is_some();
                 let key = self.keymap.text(Action::Pause);
@@ -879,6 +915,12 @@ impl App {
             ui.menu_button("Chapters", |ui| self.chapters_menu(ui));
         });
         ui.menu_button("Bookmarks", |ui| self.bookmarks_menu(ui));
+        if menu_item(ui, "Find duplicates…", "") {
+            self.ask_twins();
+        }
+        if self.frames_video().is_some() && menu_item(ui, "Pick a frame…", "") {
+            self.open_frames(&ctx);
+        }
         ui.menu_button("Sort by", |ui| {
             let mut changed = false;
             let sorts: &[(SortBy, &str)] = &[
@@ -1205,6 +1247,19 @@ impl App {
                 check(ui, &mut self.settings.enlarge_small, "Enlarge small images to fit", &enlarge);
                 check(ui, &mut self.settings.lock_zoom, "Keep the zoom for the next images", &lock);
                 check(ui, &mut self.settings.wheel_turns, "Mouse wheel turns pages (instead of zooming)", "");
+                check(ui, &mut self.settings.glide, "Glide from one image to the next", "");
+                ui.add_enabled_ui(self.settings.glide, |ui| {
+                    ui.horizontal(|ui| {
+                        row_label(ui, "Glide time");
+                        ui.add(
+                            egui::Slider::new(&mut self.settings.glide_ms, 100..=2000)
+                                .logarithmic(true)
+                                .suffix(" ms")
+                                .trailing_fill(true)
+                                .handle_shape(egui::style::HandleShape::Rect { aspect_ratio: 0.5 }),
+                        );
+                    });
+                });
                 check(ui, &mut self.settings.click_zones, "Click the left / right side to go back / on", "");
                 check(ui, &mut self.settings.arrows_pan, "Arrow keys look around a zoomed-in image first", "");
                 let sharp = self.settings.sharp_pixels;
@@ -1482,6 +1537,114 @@ impl App {
         });
     }
 
+    fn ask_twins(&mut self) {
+        self.twins_ask = Some(self.dialog_dir().map(|d| d.display().to_string()).unwrap_or_default());
+    }
+
+    /// Which folder and how alike, before the duplicate finder starts.
+    fn twins_box(&mut self, ctx: &egui::Context) {
+        let (mut browse, mut scan, mut cancel) = (false, false, false);
+        egui::Area::new(egui::Id::new("twins-ask"))
+            .fixed_pos(ctx.content_rect().center())
+            .pivot(Align2::CENTER_CENTER)
+            .order(egui::Order::Foreground)
+            .show(ctx, |ui| {
+                panel_frame().fill(theme::bar()).inner_margin(egui::Margin::same(16)).show(ui, |ui| {
+                    ui.label(RichText::new("Find duplicates").strong());
+                    ui.add_space(6.0);
+                    let Some(folder) = self.twins_ask.as_mut() else {
+                        return;
+                    };
+                    ui.horizontal(|ui| {
+                        ui.add(egui::TextEdit::singleline(folder).hint_text("Folder").desired_width(380.0));
+                        browse = ui.button("Browse…").clicked();
+                    });
+                    ui.add_space(4.0);
+                    ui.checkbox(&mut self.settings.twins_subfolders, "Include subfolders");
+                    ui.add_space(10.0);
+                    let mut percent = self.settings.twins_threshold * 100.0;
+                    ui.horizontal(|ui| {
+                        row_label(ui, "Alike at least");
+                        ui.add(egui::Slider::new(&mut percent, 50.0..=100.0).step_by(1.0).fixed_decimals(0).suffix("%"));
+                    });
+                    self.settings.twins_threshold = percent / 100.0;
+                    ui.add_space(10.0);
+                    let exists = std::path::Path::new(folder.trim()).is_dir();
+                    ui.horizontal(|ui| {
+                        scan = ui.add_enabled(exists, egui::Button::new("Scan  (Enter)")).clicked()
+                            || exists && ui.input(|i| i.key_pressed(egui::Key::Enter));
+                        cancel = ui.button("Cancel  (Esc)").clicked() || ui.input(|i| i.key_pressed(egui::Key::Escape));
+                    });
+                });
+            });
+        if browse {
+            let mut dialog = rfd::FileDialog::new();
+            if let Some(dir) = self.dialog_dir() {
+                dialog = dialog.set_directory(dir);
+            }
+            if let Some(p) = dialog.pick_folder() {
+                self.twins_ask = Some(p.display().to_string());
+            }
+        } else if cancel {
+            self.twins_ask = None;
+        } else if scan && let Some(folder) = self.twins_ask.take() {
+            let mut options = crate::twins::Options::new(folder.trim());
+            options.subfolders = self.settings.twins_subfolders;
+            options.is_image = files::is_image;
+            options.decode = crate::loader::decode_for_twins;
+            self.twins = Some(crate::twins::Panel::new(options, self.settings.twins_threshold, crate::actions::recycle));
+            // Nothing carries on unseen behind it.
+            self.slideshow = None;
+            if let Some(v) = &mut self.video {
+                v.pause();
+            }
+        }
+    }
+
+    /// The video on screen, when it's a real file rather than a page inside an archive.
+    fn frames_video(&self) -> Option<std::path::PathBuf> {
+        self.current_file().filter(|p| crate::video::is_video(p))
+    }
+
+    fn open_frames(&mut self, ctx: &egui::Context) {
+        let Some(path) = self.frames_video() else { return };
+        self.slideshow = None;
+        let mut at = None;
+        if let Some(v) = self.video.as_mut().filter(|v| v.path == path) {
+            v.pause();
+            at = Some(v.position());
+        }
+        self.frames = Some(crate::frames::Picker::new(ctx, path, at));
+    }
+
+    /// The frame picker, over the whole window.
+    pub fn draw_frames(&mut self, ui: &mut egui::Ui, ctx: &egui::Context) {
+        let Some(picker) = &mut self.frames else { return };
+        if picker.show(ui) {
+            let saved = picker.saved_any();
+            self.frames = None;
+            // The new picture may be in the open folder.
+            if saved {
+                self.resort(ctx);
+            }
+        }
+    }
+
+    /// The duplicate finder, over the whole window.
+    pub fn draw_twins(&mut self, ui: &mut egui::Ui, ctx: &egui::Context) {
+        let Some(panel) = &mut self.twins else { return };
+        let frame = egui::Frame::NONE.fill(ui.visuals().panel_fill);
+        match egui::CentralPanel::default().frame(frame).show(ui, |ui| panel.show(ui)).inner {
+            Some(crate::twins::Event::Deleted(paths)) => self.forget_files(ctx, &paths),
+            Some(crate::twins::Event::Closed) => {
+                self.settings.twins_threshold = panel.threshold();
+                self.twins = None;
+            }
+            None => {}
+        }
+        self.draw_toast(ctx);
+    }
+
     fn confirm_delete_box(&mut self, ctx: &egui::Context) {
         let Some(path) = self.confirm_delete.clone() else { return };
         let screen = ctx.content_rect();
@@ -1516,6 +1679,35 @@ impl App {
             }
             Some(false) => self.confirm_delete = None,
             None => {}
+        }
+    }
+
+    fn confirm_leave_box(&mut self, ctx: &egui::Context) {
+        let Some(e) = &mut self.edit else { return };
+        let mut throw_away = false;
+        egui::Area::new(egui::Id::new("confirm-leave"))
+            .fixed_pos(ctx.content_rect().center())
+            .pivot(Align2::CENTER_CENTER)
+            .order(egui::Order::Foreground)
+            .show(ctx, |ui| {
+                let frame = egui::Frame::NONE
+                    .fill(theme::bar())
+                    .stroke(Stroke::new(1.0, theme::line()))
+                    .inner_margin(egui::Margin::same(18));
+                frame.show(ui, |ui| {
+                    ui.label(RichText::new("Throw away your changes?").size(16.0));
+                    ui.label(dim(&format!("{} stays as it was.", files::file_name(&e.path))));
+                    ui.add_space(10.0);
+                    ui.horizontal(|ui| {
+                        throw_away = ui.button("Throw away  (Enter)").clicked();
+                        if ui.button("Keep editing  (Esc)").clicked() {
+                            e.keep_editing();
+                        }
+                    });
+                });
+            });
+        if throw_away {
+            self.discard_edit(ctx);
         }
     }
 
@@ -1761,6 +1953,8 @@ pub const TOOLBAR_BUTTONS: &[(&str, &str)] = &[
     ("counter", "Page number"),
     ("bookmark", "Bookmark"),
     ("info", "Info"),
+    ("twins", "Find duplicates"),
+    ("frames", "Pick a frame"),
     ("fullscreen", "Fullscreen"),
 ];
 
@@ -1848,7 +2042,7 @@ pub fn icon_button(
     if enabled { resp.on_hover_text(tooltip) } else { resp }
 }
 
-fn separator(ui: &mut egui::Ui) {
+pub fn separator(ui: &mut egui::Ui) {
     let (rect, _) = ui.allocate_exact_size(Vec2::new(13.0, TOP_BAR_H), Sense::hover());
     let x = rect.center().x.round() + 0.5;
     ui.painter().vline(x, rect.center().y - 9.0..=rect.center().y + 9.0, Stroke::new(1.0, theme::line()));

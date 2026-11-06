@@ -28,7 +28,7 @@ pub fn is_video(p: &Path) -> bool {
     EXTENSIONS.contains(&ext.as_str())
 }
 
-fn command(program: &str) -> Command {
+pub(crate) fn command(program: &str) -> Command {
     let mut cmd = match bundled() {
         Some(bin) => {
             let mut cmd = Command::new(bin.join(format!("{program}{}", std::env::consts::EXE_SUFFIX)));
@@ -83,7 +83,7 @@ fn no_window(cmd: &mut Command) {
 #[cfg(not(windows))]
 fn no_window(_: &mut Command) {}
 
-fn ffmpeg_missing(e: std::io::Error) -> String {
+pub(crate) fn ffmpeg_missing(e: std::io::Error) -> String {
     if e.kind() == std::io::ErrorKind::NotFound {
         if cfg!(target_os = "macos") {
             "Videos need ffmpeg: brew install ffmpeg".to_owned()
@@ -140,18 +140,29 @@ pub fn still(bytes: &[u8], ext: &str) -> Result<Vec<u8>, String> {
     Ok(out.stdout)
 }
 
-struct Info {
+pub(crate) struct Info {
     /// Decoded frame size (turned like the phone held it, scaled to `MAX_SIDE`).
     size: [usize; 2],
     fps: f64,
-    duration: f64,
+    pub(crate) duration: f64,
     audio: bool,
+    pub(crate) source: Source,
 }
 
-fn probe(path: &Path) -> Result<Info, String> {
+/// What the file itself says, before the limits playback puts on it.
+pub(crate) struct Source {
+    /// Turned like the phone held it.
+    pub(crate) size: [u32; 2],
+    pub(crate) fps: f64,
+    /// 0 when the file doesn't say.
+    pub(crate) frames: u64,
+    pub(crate) codec: String,
+}
+
+pub(crate) fn probe(path: &Path) -> Result<Info, String> {
     let out = command("ffprobe")
         .args(["-v", "error", "-show_entries"])
-        .arg("stream=codec_type,width,height,avg_frame_rate,r_frame_rate:stream_side_data=rotation:format=duration")
+        .arg("stream=codec_name,codec_type,width,height,avg_frame_rate,r_frame_rate,nb_frames:stream_side_data=rotation:format=duration")
         .args(["-of", "default=nw=1"])
         .arg(path)
         .stdin(Stdio::null())
@@ -160,6 +171,7 @@ fn probe(path: &Path) -> Result<Info, String> {
     let text = String::from_utf8_lossy(&out.stdout);
     let (mut w, mut h, mut duration, mut rotation, mut audio) = (0u32, 0u32, 0.0, 0i32, false);
     let (mut avg, mut base) = (0.0, 0.0);
+    let (mut frames, mut name, mut codec) = (0, "", String::new());
     let mut in_video = false;
     let rate = |v: &str| match v.split_once('/') {
         Some((a, b)) => a.parse::<f64>().unwrap_or(0.0) / b.parse::<f64>().unwrap_or(0.0).max(1.0),
@@ -168,10 +180,16 @@ fn probe(path: &Path) -> Result<Info, String> {
     for line in text.lines() {
         let Some((k, v)) = line.split_once('=') else { continue };
         match k {
+            // ffprobe prints the name first, before saying what kind of stream this is.
+            "codec_name" => name = v,
             "codec_type" => {
                 in_video = v == "video" && w == 0;
                 audio |= v == "audio";
+                if in_video {
+                    codec = name.to_owned();
+                }
             }
+            "nb_frames" if in_video => frames = v.parse().unwrap_or(0),
             "width" if in_video => w = v.parse().unwrap_or(0),
             "height" if in_video => h = v.parse().unwrap_or(0),
             "avg_frame_rate" if in_video => avg = rate(v),
@@ -192,8 +210,9 @@ fn probe(path: &Path) -> Result<Info, String> {
     let even = |v: u32| (((v as f64 * scale) as u32).max(2) & !1) as usize;
     // A bare stream (.hevc, .h264) has no length, and its average rate is a guess.
     let fps = if duration > 0.0 && avg > 1.0 { avg } else if base > 1.0 { base } else { avg };
-    let fps = if fps.is_finite() && fps > 1.0 { fps.min(MAX_FPS) } else { 30.0 };
-    Ok(Info { size: [even(w), even(h)], fps, duration, audio })
+    let fps = if fps.is_finite() && fps > 1.0 { fps } else { 30.0 };
+    let source = Source { size: [w, h], fps, frames, codec };
+    Ok(Info { size: [even(w), even(h)], fps: fps.min(MAX_FPS), duration, audio, source })
 }
 
 /// The sound card side: a queue of samples ffmpeg fills and the device drains.
@@ -401,6 +420,12 @@ impl Player {
     /// Plays one that was opened ahead, paused.
     fn play(&mut self) {
         if self.paused && !self.ended {
+            self.toggle_pause();
+        }
+    }
+
+    pub fn pause(&mut self) {
+        if !self.paused && !self.ended {
             self.toggle_pause();
         }
     }
