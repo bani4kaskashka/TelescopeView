@@ -6,6 +6,8 @@ All notable changes to TelescopeView are listed here. The format follows
 
 ## [Unreleased]
 
+## [1.0.0]
+
 ### Added
 - Picture editor: the pencil in the top bar, Shift+E or the ... menu opens it along the bottom. Dials
   for light balance, brightness, exposure, contrast, highlights, shadows, saturation, tint,
@@ -89,7 +91,8 @@ The first release.
 - One window: files opened while TelescopeView is running show up in the open window.
 - Windows "Open with" and Default apps registration, for the current user only.
 
-[Unreleased]: https://github.com/bani4kaskashka/TelescopeView/compare/v0.1.4...HEAD
+[Unreleased]: https://github.com/bani4kaskashka/TelescopeView/compare/v1.0.0...HEAD
+[1.0.0]: https://github.com/bani4kaskashka/TelescopeView/compare/v0.1.4...v1.0.0
 [0.1.4]: https://github.com/bani4kaskashka/TelescopeView/compare/v0.1.3...v0.1.4
 [0.1.3]: https://github.com/bani4kaskashka/TelescopeView/compare/v0.1.2...v0.1.3
 [0.1.2]: https://github.com/bani4kaskashka/TelescopeView/compare/v0.1.1...v0.1.2
