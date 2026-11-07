@@ -280,7 +280,7 @@ mod tests {
     /// this passes, the Rust runtime computes what was trained.
     #[test]
     fn matches_pytorch() {
-        let g = include_bytes!("../tests/golden.bin");
+        let g = include_bytes!("golden.bin");
         let read_u32 = |at: usize| u32::from_le_bytes(g[at..at + 4].try_into().unwrap()) as usize;
         let (model_len, side) = (read_u32(0), read_u32(4));
         let model = Model::from_bytes(&g[8..8 + model_len]).unwrap();
@@ -288,14 +288,14 @@ mod tests {
             .chunks_exact(4)
             .map(|c| f32::from_le_bytes(c.try_into().unwrap()))
             .collect();
-        let margin = model.radius().max(crate::plane::MIN_MARGIN);
+        let margin = model.radius().max(crate::enlarge::plane::MIN_MARGIN);
         let extended = side + 2 * margin;
         let (input, expected) = floats.split_at(extended * extended);
         assert_eq!(expected.len(), 4 * side * side);
 
         let mut big = vec![0.0; 4 * side * side];
         let mut temp = vec![0.0; 2 * side * (side + 4)];
-        crate::plane::interpolate(input, extended, margin, side, side, &mut big, &mut temp);
+        crate::enlarge::plane::interpolate(input, extended, margin, side, side, &mut big, &mut temp);
         let mut work = model.work_for(extended);
         model.add_detail(input, extended, extended, margin, side, side, 1.0, &mut big, &mut work);
 

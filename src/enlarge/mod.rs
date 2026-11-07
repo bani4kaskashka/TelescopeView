@@ -12,6 +12,9 @@
 //! This blocks until it is done, so call it from a worker thread. Use [`enlarge_with`] for a
 //! progress bar and a cancel button.
 
+// The standalone enlarger as it is, so fixes copy across: the app uses only part of its API.
+#![allow(dead_code, clippy::chunks_exact_to_as_chunks, clippy::needless_range_loop)]
+
 mod model;
 mod plane;
 
@@ -76,7 +79,7 @@ impl std::error::Error for Error {}
 pub fn builtin_model() -> &'static Model {
     static MODEL: OnceLock<Model> = OnceLock::new();
     MODEL.get_or_init(|| {
-        Model::from_bytes(include_bytes!("../models/default.enl")).expect("built-in model is valid")
+        Model::from_bytes(include_bytes!("default.enl")).expect("built-in model is valid")
     })
 }
 

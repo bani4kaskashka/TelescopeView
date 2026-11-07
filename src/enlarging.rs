@@ -1,4 +1,4 @@
-//! Save an enlarged copy: runs the picture on screen through the `enlarge` crate on its own
+//! Save an enlarged copy: runs the picture on screen through `crate::enlarge` on its own
 //! thread and writes the result next to it. The file it came from is never touched.
 
 use crate::actions::{can_write, write_edited};
@@ -74,7 +74,7 @@ fn work(source: &Path, doublings: u32, turns: u8, progress: &AtomicU32, cancel: 
     let mut rgba = img.into_raw();
     // One core left over, so the window stays smooth.
     let threads = std::thread::available_parallelism().map_or(1, |n| n.get().saturating_sub(1).max(1));
-    let options = enlarge::Options { threads, ..Default::default() };
+    let options = crate::enlarge::Options { threads, ..Default::default() };
     for pass in 0..doublings {
         // The second doubling has four times the pixels, so it takes four times as long.
         let (start, share) = match (doublings, pass) {
@@ -82,7 +82,7 @@ fn work(source: &Path, doublings: u32, turns: u8, progress: &AtomicU32, cancel: 
             (_, 0) => (0.0, 0.2),
             _ => (0.2, 0.8),
         };
-        rgba = enlarge::enlarge_with(&rgba, w, h, &options, &|done| {
+        rgba = crate::enlarge::enlarge_with(&rgba, w, h, &options, &|done| {
             progress.store(((start + done * share) * 999.0) as u32, Relaxed);
             !cancel.load(Relaxed)
         })
