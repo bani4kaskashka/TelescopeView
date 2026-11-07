@@ -17,6 +17,7 @@
 </p>
 
 <p align="center">
+  <a href="https://bani4kaskashka.github.io/TelescopeView/">Website</a> ·
   <a href="#download">Download</a> ·
   <a href="docs/GUIDE.md">User guide</a> ·
   <a href="#building-from-source">Build from source</a> ·

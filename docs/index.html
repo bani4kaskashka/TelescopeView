@@ -1,0 +1,724 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>TelescopeView</title>
+<meta name="description" content="Pictures, videos and comics. One fast app for all of it. Free and open source for Windows, macOS and Linux.">
+<meta name="theme-color" content="#101010">
+<meta property="og:type" content="website">
+<meta property="og:title" content="TelescopeView">
+<meta property="og:description" content="Pictures, videos and comics. One fast app for all of it.">
+<meta property="og:url" content="https://bani4kaskashka.github.io/TelescopeView/">
+<meta property="og:image" content="https://bani4kaskashka.github.io/TelescopeView/images/social-preview.png">
+<meta name="twitter:card" content="summary_large_image">
+<link rel="icon" href="images/icon-256.png">
+<style>
+@font-face { font-family: "Ubuntu Light"; src: url("fonts/Ubuntu-Light.ttf") format("truetype"); font-display: swap; }
+@font-face { font-family: "Hack"; src: url("fonts/Hack-Regular.ttf") format("truetype"); font-display: swap; }
+
+/* The same values as src/theme.rs. */
+:root {
+  --bg: #101010; --bar: #151515; --line: #282828; --hover: #2a2a2a; --selected: #3a3a3a;
+  --text: #f5f5f5; --dim: #8c8c8c; --icon: #f0f0f0;
+  --bars: 34px; --pos: 18px; --gutter: 32px;
+  color-scheme: dark;
+}
+@media (prefers-color-scheme: light) {
+  :root:not([data-theme="dark"]) {
+    --bg: #f2f2f2; --bar: #ffffff; --line: #dadada; --hover: #e8e8e8; --selected: #d6d6d6;
+    --text: #121212; --dim: #696969; --icon: #181818;
+    color-scheme: light;
+  }
+}
+:root[data-theme="light"] {
+  --bg: #f2f2f2; --bar: #ffffff; --line: #dadada; --hover: #e8e8e8; --selected: #d6d6d6;
+  --text: #121212; --dim: #696969; --icon: #181818;
+  color-scheme: light;
+}
+:root[data-theme="dark"] { color-scheme: dark; }
+
+* { box-sizing: border-box; border-radius: 0; }
+html { scroll-padding-top: calc(var(--bars) + 24px); -webkit-text-size-adjust: 100%; }
+body {
+  margin: 0; padding: var(--bars) 0 var(--pos);
+  background: var(--bg); color: var(--text);
+  font: 16px/1.55 "Ubuntu Light", "Segoe UI", system-ui, sans-serif;
+}
+a { color: inherit; }
+img { display: block; max-width: 100%; height: auto; }
+h1, h2, h3, p, ul { margin: 0; padding: 0; }
+h1, h2, h3, b, strong { font-weight: normal; }
+ul { list-style: none; }
+code, kbd, .mono { font-family: "Hack", ui-monospace, Consolas, monospace; font-size: .86em; }
+svg.i { width: 18px; height: 18px; fill: none; stroke: currentColor; stroke-width: 1.6; stroke-linecap: square; stroke-linejoin: miter; display: block; }
+:focus-visible { outline: 2px solid var(--text); outline-offset: 2px; }
+
+/* The toolbar. */
+.top {
+  position: fixed; inset: 0 0 auto 0; z-index: 10; height: var(--bars);
+  display: flex; align-items: center; gap: 2px; padding: 0 6px;
+  background: var(--bar); border-bottom: 1px solid var(--line);
+}
+.top a, .top button {
+  height: 26px; min-width: 28px; padding: 0 5px; border: 0; background: none; color: var(--icon);
+  display: inline-flex; align-items: center; justify-content: center; gap: 7px;
+  font: inherit; font-size: 14px; text-decoration: none; cursor: pointer;
+}
+.top a:hover, .top button:hover { background: var(--hover); }
+.top .sep { width: 1px; height: 18px; background: var(--line); margin: 0 6px; }
+.top .logo svg { width: 20px; height: 20px; }
+.top .name { padding: 0 8px; font-size: 14px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; min-width: 0; }
+.top .grow { flex: 1; }
+.top .count { color: var(--dim); padding: 0 10px; white-space: nowrap; }
+.top .get { background: var(--selected); padding: 0 12px; }
+
+/* The position bar. */
+.pos {
+  position: fixed; inset: auto 0 0 0; z-index: 10; height: var(--pos);
+  background: var(--bar); border-top: 1px solid var(--line); cursor: pointer; touch-action: none;
+}
+.pos i { position: absolute; left: 10px; right: 10px; top: 7px; height: 2px; background: var(--line); display: block; }
+.pos i b { position: absolute; left: 0; top: 0; height: 100%; width: 0; background: var(--dim); display: block; }
+.pos i u { position: absolute; top: -4px; width: 2px; height: 10px; margin-left: -1px; background: var(--text); display: block; left: 0; }
+.pos s { position: absolute; top: 2px; width: 1px; height: 4px; background: var(--dim); display: block; }
+
+/* Layout. */
+.wrap { max-width: 1320px; margin: 0 auto; padding: 0 var(--gutter); }
+section { border-top: 1px solid var(--line); padding: 72px 0; }
+section.first { border-top: 0; padding: 56px 0 72px; }
+.eyebrow { color: var(--dim); font-size: 14px; margin-bottom: 10px; }
+h1 { font-size: clamp(44px, 7.5vw, 92px); line-height: 1.02; letter-spacing: -.02em; }
+h2 { font-size: clamp(30px, 4vw, 46px); line-height: 1.12; letter-spacing: -.01em; }
+h3 { font-size: 18px; margin-bottom: 4px; }
+.lead { font-size: clamp(18px, 2vw, 23px); line-height: 1.4; max-width: 34em; margin-top: 18px; }
+.dim, .note { color: var(--dim); }
+p + p { margin-top: 12px; }
+.buttons { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 28px; align-items: center; }
+.btn {
+  display: inline-flex; align-items: center; gap: 9px; height: 42px; padding: 0 18px;
+  border: 1px solid var(--line); background: var(--bar); text-decoration: none; cursor: pointer; color: var(--text); font: inherit;
+}
+.btn:hover { background: var(--hover); }
+.btn.main { background: var(--text); color: var(--bg); border-color: var(--text); }
+.btn.main:hover { opacity: .88; background: var(--text); }
+.hero-head { display: flex; align-items: center; gap: 22px; }
+.hero-head svg { width: clamp(56px, 8vw, 96px); height: auto; flex: none; }
+
+.shot { border: 1px solid var(--line); width: 100%; background: var(--bar); }
+.split { display: grid; grid-template-columns: minmax(280px, 4fr) minmax(0, 9fr); gap: 48px; align-items: start; margin-top: 8px; }
+.split > div:first-child > h2 { margin-bottom: 18px; }
+.tick { margin-top: 20px; }
+.tick li { padding: 10px 0; border-top: 1px solid var(--line); }
+.two { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; margin-top: 16px; }
+figure { margin: 0; }
+figcaption { color: var(--dim); font-size: 14px; padding-top: 7px; }
+
+/* The picture flipper. */
+.viewer { margin-top: 44px; display: grid; grid-template-columns: 104px minmax(0, 1fr); border: 1px solid var(--line); background: var(--bar); }
+.strip { display: flex; flex-direction: column; gap: 6px; padding: 8px; overflow-y: auto; border-right: 1px solid var(--line); scrollbar-width: thin; position: relative; }
+.strip button { padding: 0; border: 2px solid transparent; background: none; cursor: pointer; flex: none; display: block; width: 100%; }
+.strip button img { aspect-ratio: 16 / 10; object-fit: cover; width: 100%; }
+.strip button:hover { border-color: var(--dim); }
+.strip button[aria-current="true"] { border-color: var(--text); }
+.stage { position: relative; min-width: 0; }
+.stage > img { width: 100%; aspect-ratio: 16 / 10; object-fit: cover; }
+.zone { position: absolute; top: 0; bottom: 0; width: 33.3%; border: 0; background: none; cursor: pointer; padding: 0; color: #fff; }
+.zone.l { left: 0; } .zone.r { right: 0; }
+.zone::after {
+  content: ""; position: absolute; top: 50%; margin-top: -9px; width: 0; height: 0; opacity: 0;
+  border-top: 9px solid transparent; border-bottom: 9px solid transparent;
+  filter: drop-shadow(0 0 1px #000);
+}
+.zone.l::after { left: 14px; border-right: 12px solid #fff; }
+.zone.r::after { right: 14px; border-left: 12px solid #fff; }
+.zone:hover::after, .zone:focus-visible::after { opacity: 1; }
+.caption { grid-column: 1 / -1; display: flex; gap: 16px; align-items: baseline; padding: 9px 14px; border-top: 1px solid var(--line); font-size: 15px; }
+.caption .mono { color: var(--dim); white-space: nowrap; }
+.caption span:last-child { margin-left: auto; color: var(--dim); font-size: 14px; white-space: nowrap; }
+
+/* Why. */
+.why { display: grid; grid-template-columns: repeat(3, 1fr); margin-top: 32px; border-top: 1px solid var(--line); border-left: 1px solid var(--line); }
+.why > div { padding: 22px; border-right: 1px solid var(--line); border-bottom: 1px solid var(--line); background: var(--bar); }
+.why p { color: var(--dim); font-size: 15px; }
+
+/* Before and after, like Compare in the editor. */
+.compare { position: relative; overflow: hidden; border: 1px solid var(--line); margin-top: 8px; touch-action: pan-y; --x: 42%; }
+.compare img { width: 100%; }
+.compare .after { position: absolute; inset: 0; clip-path: inset(0 0 0 var(--x)); }
+.compare .line { position: absolute; top: 0; bottom: 0; left: var(--x); width: 1px; background: #fff; pointer-events: none; }
+.compare .line::after {
+  content: "\2039\00a0\203a"; position: absolute; top: 44%; left: -11px; width: 22px; height: 26px;
+  background: #fff; color: #111; font: 14px/24px "Hack", monospace; text-align: center; white-space: nowrap; letter-spacing: -2px;
+}
+.compare input { position: absolute; inset: 0; width: 100%; height: 100%; margin: 0; opacity: 0; cursor: ew-resize; touch-action: pan-y; }
+.compare .tag { position: absolute; top: 8px; background: rgba(21,21,21,.92); color: #f5f5f5; font-size: 13px; padding: 2px 8px; pointer-events: none; }
+.compare .tag.b { left: 8px; } .compare .tag.a { right: 8px; }
+.dials { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 20px; }
+.dials li { border: 1px solid var(--line); background: var(--bar); padding: 2px 9px; font-size: 14px; }
+
+/* Everything else, and the formats. */
+.rows { margin-top: 32px; border-top: 1px solid var(--line); }
+.rows > div { display: grid; grid-template-columns: minmax(150px, 3fr) 10fr; gap: 24px; padding: 13px 0; border-bottom: 1px solid var(--line); }
+.rows p { margin: 0; color: var(--dim); }
+.chips { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 10px; }
+.chips li { padding: 3px 9px; background: var(--bar); border: 1px solid var(--line); }
+.formats { display: grid; grid-template-columns: 1fr 1fr; gap: 28px 48px; margin-top: 32px; }
+
+/* Shortcuts. */
+.keys { display: grid; grid-template-columns: repeat(2, 1fr); gap: 0 48px; margin-top: 8px; }
+.keys div { display: flex; justify-content: space-between; gap: 16px; padding: 8px 0; border-bottom: 1px solid var(--line); }
+.keys span { color: var(--dim); text-align: right; }
+
+/* Downloads. */
+.table { overflow-x: auto; margin-top: 32px; border: 1px solid var(--line); background: var(--bar); }
+table { border-collapse: collapse; width: 100%; min-width: 620px; }
+th, td { text-align: left; font-weight: normal; padding: 12px 14px; border-bottom: 1px solid var(--line); vertical-align: top; }
+thead th { color: var(--dim); font-size: 14px; }
+tbody tr:last-child > * { border-bottom: 0; }
+tr.you { background: var(--hover); }
+td a { display: block; padding: 2px 0; }
+.small { font-size: 13px; color: var(--dim); }
+.notes { margin-top: 24px; display: grid; grid-template-columns: repeat(3, 1fr); gap: 24px; }
+.notes p { color: var(--dim); font-size: 15px; }
+
+footer { border-top: 1px solid var(--line); padding: 32px 0 40px; color: var(--dim); font-size: 14px; }
+footer p + p { margin-top: 8px; }
+
+@media (max-width: 980px) {
+  .split { grid-template-columns: 1fr; gap: 28px; }
+  .why { grid-template-columns: 1fr 1fr; }
+  .notes { grid-template-columns: 1fr; gap: 14px; }
+  .formats { grid-template-columns: 1fr; }
+}
+@media (max-width: 680px) {
+  :root { --gutter: 16px; }
+  section { padding: 48px 0; }
+  section.first { padding: 32px 0 48px; }
+  .hero-head { gap: 14px; flex-wrap: wrap; }
+  h1 { font-size: min(11.7vw, 44px); }
+  table { min-width: 0; }
+  th, td { padding: 10px; }
+  .viewer { grid-template-columns: minmax(0, 1fr); margin-top: 28px; }
+  .strip { flex-direction: row; order: 2; overflow-x: auto; overflow-y: hidden; border-right: 0; border-top: 1px solid var(--line); }
+  .strip button { width: 84px; }
+  .caption { order: 3; flex-wrap: wrap; gap: 4px 12px; }
+  .caption span:last-child { display: none; }
+  .why, .two, .keys { grid-template-columns: 1fr; }
+  .rows > div { grid-template-columns: 1fr; gap: 2px; }
+  .top .hide-s { display: none; }
+  .top .name { padding: 0 4px; }
+  .top .count { padding: 0 4px; }
+}
+@media (prefers-reduced-motion: no-preference) { html { scroll-behavior: smooth; } }
+</style>
+</head>
+<body>
+
+<svg width="0" height="0" style="position:absolute" aria-hidden="true">
+  <symbol id="prev" viewBox="0 0 24 24"><path d="M15 5l-7 7 7 7"/></symbol>
+  <symbol id="next" viewBox="0 0 24 24"><path d="M9 5l7 7-7 7"/></symbol>
+  <symbol id="theme" viewBox="0 0 24 24"><path d="M12 3a9 9 0 1 0 0 18z" fill="currentColor"/><path d="M12 3a9 9 0 1 1 0 18"/></symbol>
+  <symbol id="guide" viewBox="0 0 24 24"><path d="M2 5h9v14H2z"/><path d="M13 5h9v14h-9z"/></symbol>
+  <symbol id="code" viewBox="0 0 24 24"><path d="M8 7l-5 5 5 5M16 7l5 5-5 5"/></symbol>
+  <symbol id="down" viewBox="0 0 24 24"><path d="M12 3v13M6 11l6 6 6-6M4 21h16"/></symbol>
+  <symbol id="app" viewBox="0 0 64 64"><rect width="64" height="64" fill="#161616" stroke="none"/><g fill="none" stroke="#f2f2f2" stroke-linecap="butt" stroke-linejoin="miter"><path d="M15 37L45 23" stroke-width="9"/><path d="M45.5 22.8L54 18.8" stroke-width="13"/><path d="M7 41L13 38.2" stroke-width="5"/><path d="M30 31L21 55M30 31L39 55" stroke-width="3.5"/></g><path d="M50 5h5v5h-5zM58 13h3v3h-3z" fill="#f2f2f2" stroke="none"/></symbol>
+</svg>
+
+<nav class="top" aria-label="Page">
+  <a class="logo" href="#top" title="TelescopeView"><svg viewBox="0 0 64 64" aria-hidden="true"><use href="#app"/></svg></a>
+  <span class="sep hide-s"></span>
+  <button id="secPrev" title="Previous section" aria-label="Previous section"><svg class="i" aria-hidden="true"><use href="#prev"/></svg></button>
+  <button id="secNext" title="Next section" aria-label="Next section"><svg class="i" aria-hidden="true"><use href="#next"/></svg></button>
+  <span class="name" id="secName">TelescopeView</span>
+  <span class="grow"></span>
+  <span class="count mono" id="secCount" aria-hidden="true">1 / 1</span>
+  <a class="hide-s" href="https://github.com/bani4kaskashka/TelescopeView/blob/main/docs/GUIDE.md" title="User guide"><svg class="i" aria-hidden="true"><use href="#guide"/></svg></a>
+  <a class="hide-s" href="https://github.com/bani4kaskashka/TelescopeView" title="Source code on GitHub"><svg class="i" aria-hidden="true"><use href="#code"/></svg></a>
+  <button id="themeBtn" title="Theme (T)" aria-label="Switch theme"><svg class="i" aria-hidden="true"><use href="#theme"/></svg></button>
+  <a class="get" href="#download">Download</a>
+</nav>
+
+<main class="wrap" id="top">
+
+<section class="first" data-name="TelescopeView">
+  <div class="hero-head">
+    <svg viewBox="0 0 64 64" aria-hidden="true"><use href="#app"/></svg>
+    <h1>TelescopeView</h1>
+  </div>
+  <p class="lead">Pictures, videos and comics. One fast app for all of it. Open the formats other apps won't, edit and crop pictures, save frames from videos, clear out duplicates, and read comics, manga and webtoons, all in one window.</p>
+  <div class="buttons">
+    <a class="btn main" id="heroGet" href="#download"><svg class="i" aria-hidden="true"><use href="#down"/></svg><span id="heroGetText">Download</span></a>
+    <a class="btn" href="https://github.com/bani4kaskashka/TelescopeView">Source on GitHub</a>
+    <span class="dim" id="heroMeta">Free and open source. Windows, macOS and Linux.</span>
+  </div>
+
+  <div class="viewer" id="viewer" role="group" aria-label="Screenshots of TelescopeView">
+    <div class="strip" id="strip"></div>
+    <div class="stage">
+      <img id="stageImg" src="shots/main.webp" width="1600" height="1000" alt="">
+      <button class="zone l" id="zoneL" aria-label="Previous screenshot"></button>
+      <button class="zone r" id="zoneR" aria-label="Next screenshot"></button>
+    </div>
+    <div class="caption" aria-live="polite">
+      <span class="mono" id="capCount">1 / 1</span>
+      <span id="capText"></span>
+      <span>Arrow keys or the sides flip, just like the app.</span>
+    </div>
+  </div>
+</section>
+
+<section data-name="Why it's different">
+  <h2>Works ahead of you</h2>
+  <p class="lead">Most viewers make you wait for each picture, then send you to another program to do anything with it. TelescopeView keeps the next pictures ready and the tools where you already are.</p>
+  <div class="why">
+    <div><h3>Preloading in the background</h3><p>A pool of decoder threads keeps the pictures around the current one ready, and looks further ahead when you flip fast. The current picture stays up until the next is fully ready, so nothing flickers or waits.</p></div>
+    <div><h3>Instant, measured</h3><p>With 24-megapixel JPEGs on a Ryzen 7 5700X, every step was instant at 6, 15 and 30 pictures per second. Set <code>IV_STATS=1</code> to log it on your own machine.</p></div>
+    <div><h3>One app for the whole folder</h3><p>Photos, camera RAW, HEIC, JPEG XL, EXR, DDS, PSD, SVG, videos and comic archives all sit in the same gallery, so you never switch apps halfway through.</p></div>
+    <div><h3>The tools are right there</h3><p>Fix a photo, crop it, save a frame from a video or clear out duplicates without opening a second program.</p></div>
+    <div><h3>Light on the system</h3><p>One GPU upload per frame at most, and zero CPU use while idle.</p></div>
+    <div><h3>Out of the way</h3><p>Flat, square and minimal, with dark, light and high-contrast themes. The toolbar keeps to the everyday buttons. Everything else is one click away.</p></div>
+  </div>
+</section>
+
+<section data-name="Picture editor">
+  <div class="split">
+    <div>
+      <h2>Picture editor</h2>
+      <p>The pencil in the top bar opens it along the bottom. Drag a dial to change it, and drag the line to compare. Try it on the picture here.</p>
+      <ul class="dials" aria-label="Dials">
+        <li>Light balance</li><li>Brightness</li><li>Exposure</li><li>Contrast</li><li>Highlights</li><li>Shadows</li><li>Saturation</li><li>Tint</li><li>Temperature</li><li>Sharpness</li><li>Definition</li><li>Straighten</li>
+      </ul>
+      <ul class="tick">
+        <li>Crop with free, original or fixed ratios</li>
+        <li>Rotate, flip, undo and redo</li>
+        <li>EXIF and the color profile are kept</li>
+        <li>Save sends the original to the Recycle Bin. Save a copy writes a new one</li>
+      </ul>
+    </div>
+    <div>
+      <div class="compare" id="compare">
+        <img src="shots/edit-before.webp" width="1600" height="1000" loading="lazy" alt="The editor open on a photo of a small bird, before any changes.">
+        <img class="after" src="shots/edit-after.webp" width="1600" height="1000" loading="lazy" alt="The same photo after raising saturation and exposure.">
+        <span class="line"></span>
+        <span class="tag b">Before</span><span class="tag a">After</span>
+        <input id="compareRange" type="range" min="0" max="100" value="42" aria-label="Move the line between before and after">
+      </div>
+      <figure style="margin-top:16px">
+        <img class="shot" src="shots/crop.webp" width="1600" height="1000" loading="lazy" alt="The crop tool with handles and a rule-of-thirds grid over the photo.">
+        <figcaption>The crop tool, with handles and a thirds grid.</figcaption>
+      </figure>
+    </div>
+  </div>
+</section>
+
+<section data-name="Find duplicates">
+  <div class="split">
+    <div>
+      <h2>Find duplicates</h2>
+      <p>Scan a folder for exact copies and look-alikes, then go through them in pairs with the arrow keys: keep the left, keep the right, keep both.</p>
+      <ul class="tick">
+        <li>Zoom and pan both pictures together</li>
+        <li>Choose how alike pictures have to be</li>
+        <li>Nothing is deleted until you confirm on the last page, and then it goes to the Recycle Bin</li>
+      </ul>
+    </div>
+    <img class="shot" src="shots/duplicates.webp" width="1600" height="1000" loading="lazy" alt="Find duplicates showing two identical photos of a crocus side by side, with keep left, keep both, delete both and keep right buttons.">
+  </div>
+</section>
+
+<section data-name="Pick a frame">
+  <div class="split">
+    <div>
+      <h2>Pick a frame</h2>
+      <p>Split a video into every frame as a grid, starting from where the video was. Then save any frame at full resolution.</p>
+      <ul class="tick">
+        <li>PNG or JPEG, next to the video or in a folder you choose</li>
+        <li>Never overwrites a file</li>
+        <li>Arrows, Page Up and Down, or the slider to move around</li>
+      </ul>
+    </div>
+    <img class="shot" src="shots/frames.webp" width="1600" height="1000" loading="lazy" alt="Pick a frame showing a grid of video frames, with frame 74 of 240 enlarged on the right and save buttons below it.">
+  </div>
+</section>
+
+<section data-name="Comics, manga and webtoons">
+  <h2>Comics, manga and webtoons</h2>
+  <p class="lead">Drop in an archive or a folder of chapters and read. The layout is remembered per series.</p>
+  <div class="two">
+    <figure>
+      <img class="shot" src="shots/spread.webp" width="1600" height="1000" loading="lazy" alt="Two old engravings shown side by side as a two-page spread.">
+      <figcaption>Two-page spreads, with the cover alone and wide scans alone. Right to left for manga.</figcaption>
+    </figure>
+    <figure>
+      <img class="shot" src="shots/strip.webp" width="1600" height="1000" loading="lazy" alt="A folder of pictures shown as one long vertical strip with a narrow column.">
+      <figcaption>Turn a folder into one long strip, with adjustable column width and auto-scroll.</figcaption>
+    </figure>
+  </div>
+  <ul class="chips" style="margin-top:20px">
+    <li>CBZ</li><li>CBR</li><li>CB7</li><li>CBT</li><li>ZIP</li><li>RAR</li><li>7Z</li><li>TAR</li><li>EPUB</li><li>PDF (Windows)</li>
+    <li>Split wide pages</li><li>Chapter to chapter</li><li>Go to page</li><li>Bookmarks you can save as a file</li>
+  </ul>
+</section>
+
+<section data-name="Videos and photos">
+  <div class="two" style="margin-top:0">
+    <div>
+      <h2>Videos with sound</h2>
+      <p style="margin:14px 0 18px">Videos sit in the folder between the pictures and start at once, because the ones either side are opened ahead. Pause, step, seek and set the volume. GIF, APNG and animated WebP get pause and frame stepping too.</p>
+      <img class="shot" src="shots/video.webp" width="1600" height="1000" loading="lazy" alt="A video of Roman ruins playing, with the seek bar and volume along the bottom.">
+    </div>
+    <div>
+      <h2>Your photo's details</h2>
+      <p style="margin:14px 0 18px">The info panel shows size, format and file date, plus the camera, lens, exposure, date taken and GPS location from the EXIF. Press I any time.</p>
+      <img class="shot" src="shots/info.webp" width="1600" height="1000" loading="lazy" alt="A photo of pink clover flowers with the info panel showing size, camera and exposure.">
+    </div>
+  </div>
+</section>
+
+<section data-name="Save an enlarged copy">
+  <div class="split">
+    <div>
+      <h2>Save an enlarged copy</h2>
+      <p>New in 1.1. On a picture, the ... menu or a right-click saves a copy at 2x or 4x the size, right next to the original.</p>
+      <ul class="tick">
+        <li>Runs on the CPU, with nothing to install</li>
+        <li>The original is never touched</li>
+        <li>It helps most on small pictures. From about 1000 px up the difference is hard to see, and JPEG blocks stay</li>
+      </ul>
+    </div>
+    <img class="shot" src="shots/enlarge.webp" width="1600" height="1000" loading="lazy" alt="The ... menu with Save an enlarged copy open, offering 2x and 4x with the sizes they would give.">
+  </div>
+</section>
+
+<section data-name="Your way">
+  <div class="split">
+    <div>
+      <h2>Your way</h2>
+      <p>Press <kbd>T</kbd> to change this page's theme, the same key as in the app.</p>
+      <ul class="tick">
+        <li>Dark, light and high contrast</li>
+        <li>Interface size from 100 to 200%</li>
+        <li>Every shortcut can be changed</li>
+        <li>Every toolbar button can be shown or hidden</li>
+        <li>Reduce motion, and names on toolbar buttons for screen readers</li>
+      </ul>
+    </div>
+    <div>
+      <div class="two" style="margin-top:0">
+        <img class="shot" src="shots/settings.webp" width="1600" height="1000" loading="lazy" alt="The Settings window on its Look page, with theme, interface size and background options.">
+        <img class="shot" src="shots/light.webp" width="1600" height="1000" loading="lazy" alt="TelescopeView in its light theme, showing a bee on a zinnia.">
+      </div>
+      <figure style="margin-top:16px">
+        <img class="shot" src="shots/shortcuts.webp" width="1600" height="1000" loading="lazy" alt="The shortcuts list, with every action and its keys.">
+        <figcaption>H shows every shortcut.</figcaption>
+      </figure>
+    </div>
+  </div>
+</section>
+
+<section data-name="Everything it does">
+  <h2>Everything it does</h2>
+  <div class="rows">
+    <div><h3>Viewing</h3><p>Fit to window or width, zoom, zoom lock for comparing shots, enlarge small images, rotate and flip (saved losslessly into JPEGs), fullscreen, slideshow, an optional glide between images.</p></div>
+    <div><h3>Picture editor</h3><p>Twelve dials, crop, undo and redo, and a before and after line to drag. EXIF and the color profile are kept.</p></div>
+    <div><h3>Find duplicates</h3><p>Exact copies and look-alikes in pairs. Nothing is deleted until you confirm.</p></div>
+    <div><h3>Pick a frame</h3><p>Every frame of a video as a grid, saved at full resolution as PNG or JPEG.</p></div>
+    <div><h3>Save an enlarged copy</h3><p>2x or 4x, next to the original, for still pictures that are real files.</p></div>
+    <div><h3>Comics and manga</h3><p>Two-page spreads, right-to-left reading, split wide pages, chapter-to-chapter reading, go to page.</p></div>
+    <div><h3>Webtoons</h3><p>One long vertical strip from a folder, with adjustable column width and auto-scroll.</p></div>
+    <div><h3>Bookmarks</h3><p>Bookmark any page, see it on the page bar, and save it as a <code>.tvmark</code> file that reopens right there.</p></div>
+    <div><h3>Thumbnails</h3><p>A strip that slides out from any edge of the window, plus page previews on the position bar.</p></div>
+    <div><h3>Photos</h3><p>Camera, lens, exposure, date taken and GPS location from EXIF in the info panel.</p></div>
+    <div><h3>Animations and videos</h3><p>GIF, APNG and animated WebP with pause and frame stepping. Videos with sound through ffmpeg.</p></div>
+    <div><h3>Files</h3><p>Copy, paste, rename, move, delete to the Recycle Bin, set as wallpaper, show in Explorer.</p></div>
+    <div><h3>Resume</h3><p>Every folder reopens where you left it, even when an external drive comes back under another letter.</p></div>
+    <div><h3>Default app</h3><p>Tick what it should open: pictures, RAW photos, videos, comics or single formats. Everything else stays with the app that opens it now.</p></div>
+  </div>
+  <div class="buttons"><a class="btn" href="https://github.com/bani4kaskashka/TelescopeView/blob/main/docs/GUIDE.md">Read the full user guide</a></div>
+</section>
+
+<section data-name="Formats">
+  <h2>Opens what other apps won't</h2>
+  <div class="formats">
+    <div><h3>Images</h3><ul class="chips"><li>PNG</li><li>APNG</li><li>JPEG</li><li>WebP</li><li>GIF</li><li>BMP</li><li>TIFF</li><li>ICO</li><li>TGA</li><li>QOI</li><li>PNM</li><li>HDR</li><li>EXR</li><li>DDS</li><li>Farbfeld</li><li>JPEG XL</li><li>SVG</li><li>PSD</li></ul></div>
+    <div><h3>Windows extras</h3><p class="dim">Anything with an installed Windows codec.</p><ul class="chips"><li>HEIC / HEIF</li><li>AVIF</li><li>JPEG XR</li><li>DNG</li><li>CR2</li><li>CR3</li><li>NEF</li><li>ARW</li><li>and more RAW</li></ul></div>
+    <div><h3>Comics and books</h3><ul class="chips"><li>CBZ / ZIP</li><li>CBR / RAR</li><li>CB7 / 7Z</li><li>CBT / TAR</li><li>EPUB (picture books and comics)</li><li>PDF (Windows)</li></ul></div>
+    <div><h3>Videos</h3><p class="dim">Anything ffmpeg plays, with sound.</p><ul class="chips"><li>MP4</li><li>MKV</li><li>WebM</li><li>MOV</li><li>AVI</li><li>WMV</li><li>and more</li></ul></div>
+  </div>
+</section>
+
+<section data-name="Quick start">
+  <div class="split">
+    <div>
+      <h2>Quick start</h2>
+      <p>Open a picture by double-clicking it, dragging it onto the window or pressing <kbd>Ctrl+O</kbd>. Then use the arrow keys.</p>
+    </div>
+    <div class="keys">
+      <div><kbd>&larr; &rarr;</kbd><span>Previous / next</span></div>
+      <div><kbd>F</kbd><span>Fit to window</span></div>
+      <div><kbd>F11</kbd><span>Fullscreen</span></div>
+      <div><kbd>W</kbd><span>Fit to width</span></div>
+      <div><kbd>S</kbd><span>Slideshow</span></div>
+      <div><kbd>1</kbd><span>Actual size</span></div>
+      <div><kbd>R</kbd><span>Rotate</span></div>
+      <div><kbd>E</kbd><span>Enlarge small images</span></div>
+      <div><kbd>N</kbd><span>Thumbnails</span></div>
+      <div><kbd>I</kbd><span>Info and EXIF</span></div>
+      <div><kbd>V</kbd><span>Webtoon strip</span></div>
+      <div><kbd>B</kbd><span>Bookmark the page</span></div>
+      <div><kbd>P</kbd><span>Two-page spread</span></div>
+      <div><kbd>G</kbd><span>Go to page</span></div>
+      <div><kbd>M</kbd><span>Right to left (manga)</span></div>
+      <div><kbd>H</kbd><span>Every shortcut</span></div>
+      <div><kbd>Shift+E</kbd><span>Edit the picture</span></div>
+      <div><kbd>T</kbd><span>Theme</span></div>
+    </div>
+  </div>
+</section>
+
+<section id="download" data-name="Download">
+  <h2>Download</h2>
+  <p class="lead" id="dlLead">Every build comes for both x64 (Intel / AMD) and ARM64, as an installer or as a portable app.</p>
+  <div class="table">
+    <table>
+      <thead><tr><th scope="col">Platform</th><th scope="col">Installer</th><th scope="col">Portable</th></tr></thead>
+      <tbody>
+        <tr data-os="windows">
+          <th scope="row">Windows 10 / 11<div class="small">Installs for your user only, no admin</div></th>
+          <td><a data-asset="windows-x64-setup.exe" href="https://github.com/bani4kaskashka/TelescopeView/releases/latest">x64 installer</a><a data-asset="windows-arm64-setup.exe" href="https://github.com/bani4kaskashka/TelescopeView/releases/latest">ARM64 installer</a></td>
+          <td><a data-asset="windows-x64.zip" href="https://github.com/bani4kaskashka/TelescopeView/releases/latest">x64 zip</a><a data-asset="windows-arm64.zip" href="https://github.com/bani4kaskashka/TelescopeView/releases/latest">ARM64 zip</a></td>
+        </tr>
+        <tr data-os="mac">
+          <th scope="row">macOS<div class="small">One app for Apple silicon and Intel</div></th>
+          <td><a data-asset="macos-universal.dmg" href="https://github.com/bani4kaskashka/TelescopeView/releases/latest">Disk image (.dmg)</a></td>
+          <td><a data-asset="macos-universal.zip" href="https://github.com/bani4kaskashka/TelescopeView/releases/latest">Zip, just the app</a></td>
+        </tr>
+        <tr data-os="linux">
+          <th scope="row">Linux</th>
+          <td><a data-asset="_amd64.deb" href="https://github.com/bani4kaskashka/TelescopeView/releases/latest">x64 .deb</a><a data-asset="_arm64.deb" href="https://github.com/bani4kaskashka/TelescopeView/releases/latest">ARM64 .deb</a></td>
+          <td><a data-asset="linux-x64.zip" href="https://github.com/bani4kaskashka/TelescopeView/releases/latest">x64 zip</a><a data-asset="linux-arm64.zip" href="https://github.com/bani4kaskashka/TelescopeView/releases/latest">ARM64 zip</a></td>
+        </tr>
+      </tbody>
+    </table>
+  </div>
+  <div class="notes">
+    <div><h3>Videos work out of the box</h3><p>The Windows downloads and the Linux zips carry a portable ffmpeg, which is why the Windows download is about 73 MB. The .deb uses your distribution's ffmpeg. On a Mac, run <code>brew install ffmpeg</code> once.</p></div>
+    <div><h3>Not code-signed yet</h3><p>On Windows, SmartScreen asks once: choose More info, then Run anyway. On a Mac, right-click the app and choose Open the first time. Every release lists SHA-256 checksums.</p></div>
+    <div><h3>What's been tested</h3><p>Only the Windows x64 build has been tested on real hardware so far. The ARM64, macOS and Linux builds are made on GitHub's build machines. Reports are very welcome.</p></div>
+  </div>
+  <div class="buttons">
+    <a class="btn" href="https://github.com/bani4kaskashka/TelescopeView/releases">All releases</a>
+    <a class="btn" href="https://github.com/bani4kaskashka/TelescopeView/blob/main/CHANGELOG.md">Changelog</a>
+    <a class="btn" href="https://github.com/bani4kaskashka/TelescopeView/issues">Report a problem</a>
+  </div>
+</section>
+
+</main>
+
+<footer>
+  <div class="wrap">
+    <p>TelescopeView is written in Rust and dual-licensed under <a href="https://github.com/bani4kaskashka/TelescopeView/blob/main/LICENSE-MIT">MIT</a> or <a href="https://github.com/bani4kaskashka/TelescopeView/blob/main/LICENSE-APACHE">Apache 2.0</a>. CBR / RAR support uses <a href="https://www.rarlab.com/rar_add.htm">UnRAR</a>, and the Windows and Linux downloads include <a href="https://ffmpeg.org">FFmpeg</a> under the LGPL.</p>
+    <p>Every screenshot here is the real app. The pictures in them come from the PD12M public domain image set. This page uses the app's own fonts: <a href="fonts/UFL.txt">Ubuntu</a> and <a href="fonts/Hack-Regular.txt">Hack</a>.</p>
+  </div>
+</footer>
+
+<div class="pos" id="pos" role="slider" tabindex="0" aria-label="Position on the page" aria-valuemin="0" aria-valuemax="100" aria-valuenow="0"><i><b id="posFill"></b><u id="posTick"></u></i></div>
+
+<script>
+(function () {
+  "use strict";
+  var $ = function (id) { return document.getElementById(id); };
+  var root = document.documentElement;
+  var motion = window.matchMedia("(prefers-reduced-motion: reduce)").matches ? "auto" : "smooth";
+
+  /* Theme: follows the system until T or the button says otherwise, like the app. */
+  function saved(value) {
+    try {
+      if (value) localStorage.setItem("theme", value);
+      return localStorage.getItem("theme");
+    } catch (e) { return value || null; }
+  }
+  var theme = saved();
+  if (theme) root.setAttribute("data-theme", theme);
+  function toggleTheme() {
+    var now = root.getAttribute("data-theme") ||
+      (window.matchMedia("(prefers-color-scheme: light)").matches ? "light" : "dark");
+    var next = now === "light" ? "dark" : "light";
+    root.setAttribute("data-theme", next);
+    saved(next);
+  }
+  $("themeBtn").addEventListener("click", toggleTheme);
+
+  /* The flipper. Pictures are decoded ahead, and the current one stays up until the next is
+     ready, which is how the app itself avoids flicker. */
+  var slides = [
+    ["main", "Thumbnails slide out from any edge, or stay pinned."],
+    ["spread", "Two-page spreads for comics and old books."],
+    ["strip", "One long strip for webtoons."],
+    ["edit-after", "The editor opens along the bottom."],
+    ["frames", "Every frame of a video, ready to save."],
+    ["duplicates", "Go through duplicates in pairs."],
+    ["video", "Videos with sound, right in the folder."],
+    ["info", "Camera, lens and exposure from the EXIF."],
+    ["light", "A light theme, if that's your thing."]
+  ];
+  var current = 0, wanted = 0;
+  var stage = $("stageImg"), strip = $("strip");
+  var cache = slides.map(function (s) { var i = new Image(); i.src = "shots/" + s[0] + ".webp"; return i; });
+  var thumbs = slides.map(function (s, i) {
+    var b = document.createElement("button");
+    b.setAttribute("aria-label", s[1]);
+    var im = document.createElement("img");
+    im.src = "shots/" + s[0] + ".webp"; im.alt = ""; im.width = 1600; im.height = 1000; im.decoding = "async";
+    b.appendChild(im);
+    b.addEventListener("click", function () { show(i); });
+    strip.appendChild(b);
+    return b;
+  });
+  function label(i) {
+    $("capCount").textContent = (i + 1) + " / " + slides.length;
+    $("capText").textContent = slides[i][1];
+    stage.alt = slides[i][1];
+    thumbs.forEach(function (b, n) { b.setAttribute("aria-current", n === i ? "true" : "false"); });
+    var b = thumbs[i];
+    strip.scrollTo({
+      top: b.offsetTop - strip.clientHeight / 2 + b.offsetHeight / 2,
+      left: b.offsetLeft - strip.clientWidth / 2 + b.offsetWidth / 2
+    });
+  }
+  function show(i) {
+    i = (i + slides.length) % slides.length;
+    wanted = i;
+    label(i);
+    var ready = cache[i].decode ? cache[i].decode() : Promise.resolve();
+    ready.catch(function () {}).then(function () {
+      if (wanted !== i) return;
+      current = i;
+      stage.src = cache[i].src;
+    });
+  }
+  label(0);
+  $("zoneL").addEventListener("click", function () { show(wanted - 1); });
+  $("zoneR").addEventListener("click", function () { show(wanted + 1); });
+  function fitStrip() {
+    if (window.innerWidth > 680) strip.style.height = stage.offsetHeight + "px";
+    else strip.style.height = "";
+  }
+  window.addEventListener("resize", fitStrip);
+  stage.addEventListener("load", fitStrip);
+  fitStrip();
+
+  /* Before and after. */
+  var compare = $("compare"), range = $("compareRange");
+  function slide() { compare.style.setProperty("--x", range.value + "%"); }
+  range.addEventListener("input", slide);
+  slide();
+
+  /* Sections: the counter, the arrows and the position bar. */
+  var sections = Array.prototype.slice.call(document.querySelectorAll("section[data-name]"));
+  var at = 0;
+  function maxScroll() { return Math.max(1, root.scrollHeight - window.innerHeight); }
+  function goTo(i) {
+    i = Math.max(0, Math.min(sections.length - 1, i));
+    if (i === 0) window.scrollTo({ top: 0, behavior: motion });
+    else sections[i].scrollIntoView({ behavior: motion, block: "start" });
+  }
+  $("secPrev").addEventListener("click", function () { goTo(at - 1); });
+  $("secNext").addEventListener("click", function () { goTo(at + 1); });
+
+  var pos = $("pos"), fill = $("posFill"), tick = $("posTick"), track = pos.firstElementChild;
+  function markSections() {
+    pos.querySelectorAll("s").forEach(function (m) { m.remove(); });
+    sections.forEach(function (s, n) {
+      if (!n) return;
+      var m = document.createElement("s");
+      m.style.left = Math.min(100, s.offsetTop / maxScroll() * 100) + "%";
+      track.appendChild(m);
+    });
+  }
+  function onScroll() {
+    var y = window.scrollY, p = Math.min(100, y / maxScroll() * 100);
+    fill.style.width = p + "%";
+    tick.style.left = p + "%";
+    pos.setAttribute("aria-valuenow", Math.round(p));
+    var line = y + window.innerHeight * 0.35, n = 0;
+    sections.forEach(function (s, i) { if (s.offsetTop <= line) n = i; });
+    if (y >= maxScroll() - 2) n = sections.length - 1;
+    at = n;
+    $("secCount").textContent = (n + 1) + " / " + sections.length;
+    $("secName").textContent = sections[n].getAttribute("data-name");
+  }
+  function jump(e) {
+    var r = track.getBoundingClientRect();
+    var t = Math.max(0, Math.min(1, (e.clientX - r.left) / r.width));
+    window.scrollTo({ top: t * maxScroll(), behavior: "auto" });
+  }
+  var dragging = false;
+  pos.addEventListener("pointerdown", function (e) { dragging = true; pos.setPointerCapture(e.pointerId); jump(e); });
+  pos.addEventListener("pointermove", function (e) { if (dragging) jump(e); });
+  pos.addEventListener("pointerup", function () { dragging = false; });
+  pos.addEventListener("pointercancel", function () { dragging = false; });
+  pos.addEventListener("keydown", function (e) {
+    if (e.key === "ArrowLeft" || e.key === "ArrowRight") {
+      e.preventDefault(); e.stopPropagation();
+      goTo(at + (e.key === "ArrowLeft" ? -1 : 1));
+    }
+  });
+  window.addEventListener("scroll", onScroll, { passive: true });
+  function layout() { markSections(); onScroll(); }
+  window.addEventListener("resize", layout);
+  window.addEventListener("load", layout);
+  layout();
+
+  /* Keys: arrows flip the pictures while they're in view, otherwise they move between sections. */
+  function viewerInView() {
+    var r = $("viewer").getBoundingClientRect();
+    var seen = Math.min(r.bottom, window.innerHeight) - Math.max(r.top, 0);
+    return seen > r.height * 0.5;
+  }
+  document.addEventListener("keydown", function (e) {
+    if (e.ctrlKey || e.metaKey || e.altKey) return;
+    var tag = (e.target.tagName || "").toLowerCase();
+    if (tag === "input" || tag === "textarea" || tag === "select") return;
+    if (e.key === "t" || e.key === "T") { toggleTheme(); return; }
+    if (e.key !== "ArrowLeft" && e.key !== "ArrowRight") return;
+    e.preventDefault();
+    var step = e.key === "ArrowLeft" ? -1 : 1;
+    if (viewerInView()) show(wanted + step); else goTo(at + step);
+  });
+
+  /* Download links: the newest release's files, and the right button for this computer. */
+  var ua = navigator.userAgent;
+  var os = /Windows/.test(ua) ? "windows" : /Mac OS X|Macintosh/.test(ua) && !/iPhone|iPad/.test(ua) ? "mac" :
+    /Linux|X11/.test(ua) && !/Android/.test(ua) ? "linux" : null;
+  var names = { windows: "Windows", mac: "macOS", linux: "Linux" };
+  var mains = { windows: "windows-x64-setup.exe", mac: "macos-universal.dmg", linux: "linux-x64.zip" };
+  if (os) {
+    $("heroGetText").textContent = "Download for " + names[os];
+    var row = document.querySelector('tr[data-os="' + os + '"]');
+    if (row) row.className = "you";
+  }
+  fetch("https://api.github.com/repos/bani4kaskashka/TelescopeView/releases/latest")
+    .then(function (r) { if (!r.ok) throw new Error(r.status); return r.json(); })
+    .then(function (rel) {
+      var find = function (end) {
+        var a = (rel.assets || []).filter(function (x) { return x.name.slice(-end.length) === end; })[0];
+        return a && a.browser_download_url;
+      };
+      document.querySelectorAll("a[data-asset]").forEach(function (a) {
+        var url = find(a.getAttribute("data-asset"));
+        if (url) a.href = url;
+      });
+      if (os && find(mains[os])) $("heroGet").href = find(mains[os]);
+      var v = String(rel.tag_name || "").replace(/^v/, "");
+      if (v) {
+        $("heroMeta").textContent = "Version " + v + ". Free and open source. Windows, macOS and Linux.";
+        $("dlLead").textContent = "Version " + v + ", for both x64 (Intel / AMD) and ARM64, as an installer or as a portable app.";
+      }
+    })
+    .catch(function () { /* The links already go to the releases page. */ });
+})();
+</script>
+</body>
+</html>
