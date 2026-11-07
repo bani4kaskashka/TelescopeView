@@ -908,7 +908,7 @@ fn write_image(img: &RgbImage, path: &Path, jpeg: bool, quality: u8) -> Result<(
 }
 
 /// `photo.png` becomes `photo (2).png` if it already exists: saving never overwrites.
-fn unique_path(p: PathBuf) -> PathBuf {
+pub fn unique_path(p: PathBuf) -> PathBuf {
     if !p.exists() {
         return p;
     }

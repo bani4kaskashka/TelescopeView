@@ -64,7 +64,7 @@ it. TelescopeView works ahead of you, and keeps the tools where you already are:
 
 See the **[user guide](docs/GUIDE.md)** for everything it does and every shortcut.
 
-TelescopeView keeps growing, and more tools are on the way. Image upscaling is coming soon.
+TelescopeView keeps growing, and more tools are on the way. The newest one saves an enlarged copy of a picture, 2x or 4x, from the ... menu. You'll see the difference mostly on small pictures.
 
 ## Supported formats
 

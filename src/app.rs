@@ -499,6 +499,8 @@ pub struct App {
     pub twins: Option<crate::twins::Panel>,
     /// Pick a frame, over the whole window.
     pub frames: Option<crate::frames::Picker>,
+    /// Save an enlarged copy, working on its own thread.
+    pub enlarging: Option<crate::enlarging::Job>,
 }
 
 /// What the info panel reads from disk, once per page: size and dates, and a photo's EXIF.
@@ -607,6 +609,7 @@ impl App {
             twins_ask: None,
             twins: None,
             frames: None,
+            enlarging: None,
         };
         crate::instance::listen(cc.egui_ctx.clone(), app.take_launches.clone(), app.pending_open.clone());
         app.offer_default = Self::default_offer_due(&app.settings);
@@ -2200,6 +2203,7 @@ impl eframe::App for App {
             self.sync_video(ctx);
         }
         self.pump_edit(ctx);
+        self.pump_enlarging(ctx);
         // Back to the small window once the user stops flipping, freeing the far-ahead images.
         if self.fast {
             let idle = self.last_step.map_or(Duration::MAX, |t| t.elapsed());
@@ -2222,6 +2226,7 @@ impl eframe::App for App {
         } else {
             self.draw(&mut root, ctx);
         }
+        self.draw_enlarging(ctx);
         self.reveal_when_ready(ctx);
     }
 }

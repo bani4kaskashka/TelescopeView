@@ -44,6 +44,8 @@ first build takes a while.
 | `src/edit.rs` | The picture editor |
 | `src/frames.rs` | Pick a frame: the frame grid for a video |
 | `src/twins/` | Find duplicates |
+| `src/enlarging.rs` | Save an enlarged copy, running `crates/enlarge` on a thread |
+| `crates/enlarge/` | The 2x enlarger and its model, built into the app |
 | `src/winimg.rs` | Windows codecs (HEIC, AVIF, RAW, JPEG XR) and PDF pages |
 | `src/system.rs` | Windows "Open with" / Default apps registration |
 | `src/instance.rs` | One window: hands newly opened files to the running window |

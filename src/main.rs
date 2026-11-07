@@ -4,6 +4,7 @@ mod actions;
 mod app;
 mod canvas;
 mod edit;
+mod enlarging;
 mod files;
 mod frames;
 mod instance;

@@ -897,6 +897,9 @@ impl App {
             if ui.add_enabled(can_edit, menu_button("Edit the picture…", &self.keymap.text(Action::Edit))).clicked() {
                 self.start_edit(&ctx, self.index);
             }
+            ui.add_enabled_ui(self.enlarge_size().is_some(), |ui| {
+                ui.menu_button("Save an enlarged copy", |ui| self.enlarge_menu(ui));
+            });
             if self.anim_state().is_some() {
                 let paused = self.anim_pause.is_some();
                 let key = self.keymap.text(Action::Pause);
@@ -1599,6 +1602,87 @@ impl App {
                 v.pause();
             }
         }
+    }
+
+    /// The size of the picture on screen as it's turned, when it can be enlarged: a still picture
+    /// that's a real file, with nothing being enlarged yet.
+    fn enlarge_size(&self) -> Option<[u32; 2]> {
+        if self.enlarging.is_some() || self.current_file().is_none() || !self.can_edit(self.index) {
+            return None;
+        }
+        let [w, h] = self.ready(self.index)?.original_size;
+        Some(if self.current_rotation() & 1 == 1 { [h, w] } else { [w, h] })
+    }
+
+    fn enlarge_menu(&mut self, ui: &mut egui::Ui) {
+        ui.set_min_width(170.0);
+        let Some([w, h]) = self.enlarge_size() else { return };
+        for (doublings, label) in [(1, "2x"), (2, "4x")] {
+            let scale = 1 << doublings;
+            let size = format!("{} × {}", w * scale, h * scale);
+            let can = crate::enlarging::fits([w * scale, h * scale]);
+            if ui.add_enabled(can, menu_button(label, &size)).clicked()
+                && let Some(path) = self.current_file()
+            {
+                self.enlarging = Some(crate::enlarging::Job::start(path, doublings, self.current_rotation()));
+                ui.close();
+            }
+        }
+    }
+
+    /// Once a frame: takes the finished copy and shows it, unless the user has moved on.
+    pub fn pump_enlarging(&mut self, ctx: &egui::Context) {
+        let Some(job) = &self.enlarging else { return };
+        let Some(result) = job.finished() else { return };
+        let (source, cancelled) = (job.source.clone(), job.cancelled());
+        self.enlarging = None;
+        match result {
+            Ok(path) => {
+                self.toast(format!("Saved {}", crate::files::file_name(&path)));
+                let panel_open = self.edit.is_some() || self.twins.is_some() || self.frames.is_some();
+                if !panel_open && path.parent() == self.dir.as_deref() {
+                    if self.current() == Some(&source) {
+                        self.open(ctx, path);
+                    } else {
+                        self.resort(ctx);
+                    }
+                }
+            }
+            Err(_) if cancelled => {}
+            Err(msg) => self.toast(format!("Couldn't enlarge it: {msg}")),
+        }
+    }
+
+    /// How far along it is, above where the toasts go.
+    pub fn draw_enlarging(&mut self, ctx: &egui::Context) {
+        let Some(job) = &self.enlarging else { return };
+        ctx.request_repaint_after(std::time::Duration::from_millis(100));
+        let progress = job.progress();
+        let bottom = if is_fullscreen(ctx) { 76.0 } else { PAGE_BAR_H + 60.0 };
+        let frame = egui::Frame::NONE
+            .fill(theme::bar_overlay())
+            .stroke(Stroke::new(1.0, theme::line()))
+            .inner_margin(egui::Margin::symmetric(14, 6));
+        egui::Area::new(egui::Id::new("enlarging"))
+            .anchor(egui::Align2::CENTER_BOTTOM, Vec2::new(0.0, -bottom))
+            .order(egui::Order::Foreground)
+            .show(ctx, |ui| {
+                frame.show(ui, |ui| {
+                    // Tall enough for the button, so the text lines up with it.
+                    ui.spacing_mut().interact_size.y = 26.0;
+                    ui.horizontal(|ui| match progress {
+                        Some(done) => {
+                            ui.label(format!("Enlarging {:.0}%", done * 100.0));
+                            if ui.button("Cancel").clicked() {
+                                job.cancel();
+                            }
+                        }
+                        None => {
+                            ui.label("Saving the enlarged copy…");
+                        }
+                    });
+                });
+            });
     }
 
     /// The video on screen, when it's a real file rather than a page inside an archive.

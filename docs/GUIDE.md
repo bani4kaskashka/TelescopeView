@@ -74,6 +74,11 @@ zoom lock, thumbnails and the slideshow. Settings, Toolbar puts any of those bac
   JPEG next to the video, or in a folder you choose, and never over another file. Ctrl+Shift+S
   saves as, Stop keeps the frames so far, Esc closes. Long videos take memory while it's open,
   roughly 10 MB per 1000 frames. Settings, Toolbar can give it a button.
+- **Save an enlarged copy:** on a picture, the ... menu (or a right-click) saves a copy at 2x or 4x
+  the size next to it as `name 2x.jpg`, in the same format where it can, turned the way it is on
+  screen. The original is never touched and nothing is written over. It runs on the CPU with
+  nothing to install or download. It helps most on small pictures: from about 1000 px up the
+  difference is hard to see, and JPEG blocks stay. Not for pages inside archives or animations.
 - **Glide:** Settings, Viewing can slide from one image to the next, with the time it takes
   (off by default, and off with Reduce motion).
 - **Side arrows:** with click zones on, a small triangle shows on the side the mouse is on, black

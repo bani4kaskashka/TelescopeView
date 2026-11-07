@@ -152,7 +152,7 @@ fn prepare(src: &RgbaImage, s: &State, last: Option<Arc<Base>>) -> Arc<Base> {
     Arc::new(Base { turns: s.turns, angle, img, fine, coarse })
 }
 
-fn oriented(src: &RgbaImage, turns: u8) -> RgbaImage {
+pub fn oriented(src: &RgbaImage, turns: u8) -> RgbaImage {
     let flipped;
     let img = if turns & 4 != 0 {
         flipped = imageops::flip_horizontal(src);
@@ -637,12 +637,19 @@ fn turned_size(img: &RgbaImage, turns: u8) -> [u32; 2] {
     if turns % 2 == 1 { [img.height(), img.width()] } else { [img.width(), img.height()] }
 }
 
-fn load(path: &std::path::Path) -> Result<Loaded, String> {
+/// A file's picture as plain pixels, with what the decoder says about it.
+pub fn read_pixels(path: &std::path::Path) -> Result<(RgbaImage, crate::loader::Image), String> {
     let img = crate::loader::decode(path, u32::MAX)?;
     let tile = &img.frames.first().and_then(|f| f.tiles.first()).ok_or("no picture in it")?.pixels;
     let [w, h] = tile.size;
     let rgba = tile.pixels.iter().flat_map(|c| c.to_srgba_unmultiplied()).collect();
     let full = RgbaImage::from_raw(w as u32, h as u32, rgba).ok_or("odd picture size")?;
+    Ok((full, img))
+}
+
+fn load(path: &std::path::Path) -> Result<Loaded, String> {
+    let (full, img) = read_pixels(path)?;
+    let [w, h] = [full.width() as usize, full.height() as usize];
     let side = full.width().max(full.height());
     let small = if side > PREVIEW_SIDE {
         let s = PREVIEW_SIDE as f32 / side as f32;
