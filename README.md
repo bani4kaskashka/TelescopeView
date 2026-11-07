@@ -80,9 +80,6 @@ TelescopeView keeps growing, and more tools are on the way. Image upscaling is c
 Get the latest build from the **[Releases page](https://github.com/bani4kaskashka/TelescopeView/releases/latest)**.
 Every build comes for both x64 (Intel / AMD) and ARM64, as an installer or as a portable app.
 
-The picture editor, Find duplicates and Pick a frame aren't in a release yet. They come with the
-next one, or [build from source](#building-from-source) to try them now.
-
 | Platform | Installer | Portable |
 |---|---|---|
 | **Windows 10 / 11** | `TelescopeView-<version>-windows-x64-setup.exe`<br>`TelescopeView-<version>-windows-arm64-setup.exe`<br>Installs for your user only (no admin), adds a Start menu entry and an uninstaller. | `TelescopeView-<version>-windows-x64.zip`<br>`TelescopeView-<version>-windows-arm64.zip`<br>Unzip anywhere and run `TelescopeView.exe`. |
