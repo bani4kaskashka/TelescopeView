@@ -79,6 +79,16 @@ zoom lock, thumbnails and the slideshow. Settings, Toolbar puts any of those bac
   screen. The original is never touched and nothing is written over. It runs on the CPU with
   nothing to install or download. It helps most on small pictures: from about 1000 px up the
   difference is hard to see, and JPEG blocks stay. Not for pages inside archives or animations.
+- **Select text** (Shift+T, or the ... menu / a right-click): reads the words in the pages on
+  screen, comic and webtoon pages and a paused video frame included, and shows them faintly.
+  Drag across the text to pick it letter by letter, click one word, double-click a line, Ctrl+A for the whole page,
+  then Ctrl+T (or Copy text in the menu; Ctrl+C still copies the picture). While it's on, the
+  left button picks words instead of panning or turning pages; the middle button still pans.
+  Esc drops what's picked, Esc again stops. On a picture that fits the window (nothing to pan)
+  you can also just hold the left button on it for a moment and drag: the words light up as you
+  go, and a click off the words ends it. It works offline: Windows' own text recognition (the languages installed in Windows
+  Settings), Apple's Vision on a Mac (macOS 10.15 or later), and on Linux the ocrs models that
+  come with the download (Latin letters only).
 - **Glide:** Settings, Viewing can slide from one image to the next, with the time it takes
   (off by default, and off with Reduce motion).
 - **Side arrows:** with click zones on, a small triangle shows on the side the mouse is on, black
@@ -152,6 +162,9 @@ Settings, Window).
   pick it for each type there. It registers itself for "Open with" and for `.tvmark` bookmark
   files on first start, or straight away from the installer (current user only, no admin);
   uninstalling takes that back out. By hand: `TelescopeView.exe --register` / `--unregister`.
+  The Microsoft Store version has its types built in, so there's nothing to tick or register:
+  Make default just opens that page. It leaves plain `.zip`, `.rar`, `.7z`, `.tar`, `.pdf` and
+  `.epub` out of "Open with"; they still open from inside the app or by dropping them on it.
 - **Linux:** Make default writes `~/.local/share/applications/telescopeview.desktop` and sets it
   as the default for the ticked types with `xdg-mime` (needs xdg-utils; GNOME and KDE both
   follow it). `install.sh` from the .zip (or the .deb) adds the menu entry and "Open with" for
@@ -187,6 +200,9 @@ Setup 6), `sh packaging/build-linux.sh` (`TARGET=aarch64-unknown-linux-gnu` for 
 - The Mac, Linux and Windows ARM64 builds compile but haven't been tried on a real Mac, Linux
   PC or ARM64 Windows PC yet.
 - Videos on the Mac need ffmpeg from Homebrew (`brew install ffmpeg`).
+- Select text on Linux reads Latin letters only (no Cyrillic, Greek or Asian scripts), and needs
+  the `ocr` folder from the download; built from source, put the two models from
+  `packaging/build-linux.sh` in an `ocr` folder next to the program.
 - Editing: animations and videos can't be edited. Saved files are 8-bit per channel, WebP is
   written lossless, and pictures over 64 MP load scaled down, so they can only be saved as a
   smaller copy.

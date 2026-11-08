@@ -31,7 +31,11 @@ impl App {
         // double-clicks to fullscreen. A double-click on a side is just two page turns.
         let zone = resp.interact_pointer_pos().map(|p| ((p.x - rect.left()) / rect.width() * 3.0).floor() as i32);
         let editing = self.edit.is_some();
-        let side = !editing && self.settings.click_zones && !self.files.is_empty() && zone.is_some_and(|z| z != 1);
+        // Selecting text: the left button picks words instead (the middle button still pans).
+        // Set a frame before the button goes up, so the release of a hold that started it
+        // doesn't also turn the page.
+        let selecting = self.text.is_some();
+        let side = !editing && !selecting && self.settings.click_zones && !self.files.is_empty() && zone.is_some_and(|z| z != 1);
         if side && resp.clicked_by(PointerButton::Primary) {
             let towards_right = zone == Some(2);
             let forward = towards_right != (self.settings.rtl && !self.strip);
@@ -40,14 +44,14 @@ impl App {
             } else {
                 self.step(&ctx, if forward { 1 } else { -1 });
             }
-        } else if !editing && resp.double_clicked_by(PointerButton::Primary) {
+        } else if !editing && !selecting && resp.double_clicked_by(PointerButton::Primary) {
             self.toggle_fullscreen(&ctx);
         }
         if !editing {
             resp.context_menu(|ui| self.actions_menu(ui));
         }
         // A click on the middle of a video plays / pauses it.
-        if self.video.is_some() && zone == Some(1) && resp.clicked_by(PointerButton::Primary) {
+        if self.video.is_some() && !selecting && zone == Some(1) && resp.clicked_by(PointerButton::Primary) {
             self.toggle_pause();
         }
         if self.video.is_some() {
@@ -86,6 +90,7 @@ impl App {
                 self.strip_pending -= wheel_lines * STRIP_WHEEL_STEP + wheel_points;
             }
             self.strip_view(&ctx, &resp, rect, &painter);
+            self.text_layer(&ctx, &resp, &painter);
             return;
         }
 
@@ -119,6 +124,10 @@ impl App {
             }
         }
         self.page_view(&ctx, &resp, rect, &painter);
+        if !editing {
+            self.hold_to_select(&ctx, &resp);
+            self.text_layer(&ctx, &resp, &painter);
+        }
     }
 
     /// What's behind the picture.
@@ -138,7 +147,7 @@ impl App {
         let idle = self.last_activity.elapsed().as_secs_f32();
         let wait = self.settings.bars_hide_secs;
         let Some(p) = resp.hover_pos() else { return };
-        if !self.settings.click_zones || self.edit.is_some() || idle >= wait {
+        if !self.settings.click_zones || self.edit.is_some() || self.text.is_some() || idle >= wait {
             return;
         }
         ctx.request_repaint_after_secs(wait - idle);
@@ -178,6 +187,9 @@ impl App {
         });
 
         self.effective_zoom = None;
+        if failed.is_some() || self.shown.is_none() {
+            self.drawn.clear();
+        }
         if let Some(err) = failed {
             let name = current.as_deref().map(files::file_name).unwrap_or_default();
             let msg = format!("Can't open {name}\n{err}");
@@ -268,7 +280,8 @@ impl App {
         }
 
         let cropping = self.edit.as_ref().is_some_and(|e| e.cropping || e.comparing);
-        if (resp.dragged_by(PointerButton::Primary) && !cropping) || resp.dragged_by(PointerButton::Middle) {
+        let left_pans = !cropping && self.text.is_none();
+        if (resp.dragged_by(PointerButton::Primary) && left_pans) || resp.dragged_by(PointerButton::Middle) {
             self.pan += resp.drag_delta();
         }
 
@@ -300,7 +313,17 @@ impl App {
         }
         let mut drawn = Vec::new();
         let mut x = min.x;
-        for (part, turns, part_size) in &parts {
+        // Which file each part is, in the same order as `parts`.
+        let mut paths = vec![shown_path.clone()];
+        if parts.len() > 1
+            && let Some(j) = self.partner(self.index)
+        {
+            paths.push(self.files[j].clone());
+        }
+        if self.settings.rtl {
+            paths.reverse();
+        }
+        for ((part, turns, part_size), path) in parts.iter().zip(paths) {
             let w = size.x * part_size.x / natural.x;
             let rest = Rect::from_min_size(Pos2::new(x, min.y), Vec2::new(w, size.y));
             let dest = rest.translate(slide);
@@ -324,7 +347,7 @@ impl App {
                         );
                         let clipped = painter.with_clip_rect(dest.intersect(painter.clip_rect()));
                         draw_pic(&clipped, ctx, p, elapsed, whole, *turns, t.is_none());
-                        drawn.push(Drawn { pic: p.clone(), turns: *turns, rect: whole, clip: dest });
+                        drawn.push(Drawn { path, pic: p.clone(), turns: *turns, rect: whole, clip: dest });
                     } else if is_edited {
                         // A crop is the whole picture slid and enlarged, clipped to the page.
                         let clipped = painter.with_clip_rect(dest.intersect(painter.clip_rect()));
@@ -345,7 +368,7 @@ impl App {
                     } else {
                         draw_pic(painter, ctx, p, elapsed, dest, *turns, t.is_none());
                         // Where it is on screen (mid-glide too), so the next glide starts there.
-                        drawn.push(Drawn { pic: p.clone(), turns: *turns, rect: dest, clip: dest });
+                        drawn.push(Drawn { path, pic: p.clone(), turns: *turns, rect: dest, clip: dest });
                         // A playing video draws its frames over the poster, turned the same way.
                         if Arc::ptr_eq(p, &pic)
                             && let Some(v) = &self.video
@@ -409,7 +432,7 @@ impl App {
             self.settings.strip_width = (self.settings.strip_width * factor).clamp(0.15, 1.0);
             self.strip_offset *= self.strip_page_height(self.index) / before.max(1.0);
         }
-        if resp.dragged_by(PointerButton::Primary) || resp.dragged_by(PointerButton::Middle) {
+        if (resp.dragged_by(PointerButton::Primary) && self.text.is_none()) || resp.dragged_by(PointerButton::Middle) {
             self.strip_scroll_now(ctx, -resp.drag_delta().y, false);
             self.strip_pending = 0.0;
         }
@@ -451,6 +474,8 @@ impl App {
                     if let Some(wait) = draw_pic(painter, ctx, pic, elapsed, page, turns, true) {
                         next_frame = Some(next_frame.map_or(wait, |n| n.min(wait)));
                     }
+                    let path = self.files[i].clone();
+                    self.drawn.push(Drawn { path, pic: pic.clone(), turns, rect: page, clip: page });
                     let s = pic.size_turned(turns);
                     self.strip_aspect = s.y / s.x.max(1.0);
                     if i == self.index {
@@ -569,7 +594,7 @@ fn tile_mesh(tex: egui::TextureId, tile: Rect, dest: Rect, quarter_turns: u8) ->
 }
 
 /// Three small squares lighting up in turn.
-fn draw_loading(painter: &egui::Painter, center: Pos2, time: f64) {
+pub fn draw_loading(painter: &egui::Painter, center: Pos2, time: f64) {
     let lit = (time * 6.0) as usize % 3;
     for k in 0..3 {
         let c = center + Vec2::new((k as f32 - 1.0) * 10.0, 0.0);

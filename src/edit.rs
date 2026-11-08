@@ -686,6 +686,8 @@ impl App {
         if self.slideshow.is_some() {
             self.toggle_slideshow();
         }
+        // Selecting text would keep the left button from panning the preview.
+        self.text = None;
         self.edit = Some(Edit::new(ctx, self.files[i].clone(), self.current_rotation()));
         self.zoom = None;
         self.pan = Vec2::ZERO;

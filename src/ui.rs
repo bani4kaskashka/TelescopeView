@@ -822,6 +822,9 @@ impl App {
         ui.set_min_width(250.0);
         let has_pages = !self.files.is_empty();
         ui.add_enabled_ui(has_pages, |ui| {
+            if self.picked_text().is_some() && menu_item(ui, "Copy text", &self.keymap.text(Action::CopyText)) {
+                self.copy_picked_text(&ctx);
+            }
             if menu_item(ui, "Copy image", &self.keymap.text(Action::CopyImage)) {
                 self.copy_image(&ctx);
             }
@@ -830,6 +833,10 @@ impl App {
             }
             if menu_item(ui, "Copy the file", &self.keymap.text(Action::CopyFile)) {
                 self.copy_file();
+            }
+            let select = if self.text.is_some() { "Stop selecting text" } else { "Select text" };
+            if ui.add_enabled(self.edit.is_none(), menu_button(select, &self.keymap.text(Action::SelectText))).clicked() {
+                self.toggle_text_select();
             }
             if menu_item(ui, SHOW_IN_FOLDER, &self.keymap.text(Action::ShowInFolder)) {
                 self.show_in_explorer();
@@ -1913,8 +1920,11 @@ impl App {
                         let title = if menu { "Open with TelescopeView" } else { "Open your pictures and videos with TelescopeView?" };
                         ui.label(RichText::new(title).size(15.0).color(theme::text()));
                         ui.add_space(8.0);
+                        // The Store package's types are fixed, and Default apps lists them all.
+                        let packaged = crate::system::packaged();
                         let off = &mut self.settings.default_off;
-                        for (name, exts) in crate::system::groups() {
+                        let groups = if packaged { Vec::new() } else { crate::system::groups().to_vec() };
+                        for (name, exts) in groups {
                             let out = exts.iter().filter(|e| off.iter().any(|o| o == *e)).count();
                             let mut on = out < exts.len();
                             let sample = exts.iter().take(4).map(|e| e.to_uppercase()).collect::<Vec<_>>().join(", ");
@@ -1928,7 +1938,7 @@ impl App {
                         }
                         // One format at a time, for keeping, say, PNGs in another app.
                         let label = if self.default_formats { "Hide formats" } else { "Pick formats…" };
-                        if ui.add(egui::Button::new(dim(label)).frame_when_inactive(false)).clicked() {
+                        if !packaged && ui.add(egui::Button::new(dim(label)).frame_when_inactive(false)).clicked() {
                             self.default_formats = !self.default_formats;
                         }
                         if self.default_formats {
@@ -1951,7 +1961,9 @@ impl App {
                             });
                         }
                         ui.add_space(6.0);
-                        let how = if cfg!(windows) {
+                        let how = if packaged {
+                            "Windows shows its Default apps page: pick TelescopeView for each type you want it to open (apps aren't allowed to do it themselves)."
+                        } else if cfg!(windows) {
                             "Unticked types stay with the app that opens them now. Windows then shows its Default apps page: pick TelescopeView for each type listed (apps aren't allowed to do it themselves)."
                         } else {
                             "Unticked types stay with the app that opens them now."

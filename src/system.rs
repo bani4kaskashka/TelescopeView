@@ -5,7 +5,8 @@
 //!
 //! - Windows doesn't let an app make itself the default. TelescopeView registers the picked
 //!   types under HKEY_CURRENT_USER (no admin rights, nothing for other users) and opens its own
-//!   page in Settings > Default apps, where the user confirms each type.
+//!   page in Settings > Default apps, where the user confirms each type. The Store package
+//!   declares its types in packaging/windows/AppxManifest.xml instead, and writes nothing.
 //! - Linux: a .desktop file in ~/.local/share/applications, then `xdg-mime default` for the
 //!   picked types (written to ~/.config/mimeapps.list, which GNOME and KDE both read).
 //! - macOS: not yet; the app bundle's Info.plist puts it in "Open with".
@@ -62,6 +63,35 @@ fn prog_id(ext: &str) -> &'static str {
     } else {
         IMAGE_ID
     }
+}
+
+/// The ID Windows knows the app by when it runs from its Store package, else None.
+#[cfg(windows)]
+fn package_app_id() -> Option<&'static str> {
+    use windows::Win32::Foundation::ERROR_SUCCESS;
+    use windows::Win32::Storage::Packaging::Appx::GetCurrentApplicationUserModelId;
+    use windows::core::PWSTR;
+    static ID: std::sync::OnceLock<Option<String>> = std::sync::OnceLock::new();
+    ID.get_or_init(|| {
+        let mut buf = [0u16; 130]; // APPLICATION_USER_MODEL_ID_MAX_LENGTH
+        let mut len = buf.len() as u32;
+        // SAFETY: `buf` holds `len` characters and outlives the call.
+        let result = unsafe { GetCurrentApplicationUserModelId(&raw mut len, Some(PWSTR(buf.as_mut_ptr()))) };
+        // `len` counts the closing zero.
+        (result == ERROR_SUCCESS).then(|| String::from_utf16_lossy(&buf[..(len as usize).saturating_sub(1)]))
+    })
+    .as_deref()
+}
+
+/// Whether the types are fixed by the Store package, so the user can't pick them here.
+#[cfg(windows)]
+pub fn packaged() -> bool {
+    package_app_id().is_some()
+}
+
+#[cfg(not(windows))]
+pub fn packaged() -> bool {
+    false
 }
 
 /// Registers every type for "Open with", and the ones not in `off` for Default apps (so only
@@ -134,7 +164,9 @@ fn registered_off() -> Vec<String> {
 /// user confirms each one. Returns what to tell them.
 #[cfg(windows)]
 pub fn make_default(off: &[String]) -> Result<String, String> {
-    register(off).map_err(|e| format!("Couldn't register: {e}"))?;
+    if !packaged() {
+        register(off).map_err(|e| format!("Couldn't register: {e}"))?;
+    }
     open_default_apps();
     Ok("Pick TelescopeView for each type in that list (Windows asks for every one)".to_owned())
 }
@@ -182,7 +214,24 @@ pub fn is_default(off: &[String]) -> bool {
         .iter()
         .filter(|e| !off.iter().any(|o| o == *e))
         // Any of its ProgIds (older versions had one for everything), or the exe picked in "Open with".
-        .all(|ext| user_choice(ext).is_some_and(|id| id.starts_with("TelescopeView.") || id.starts_with("Applications\\TelescopeView")))
+        .all(|ext| {
+            user_choice(ext).is_some_and(|id| {
+                id.starts_with("TelescopeView.") || id.starts_with("Applications\\TelescopeView") || is_this_package(&id)
+            })
+        })
+}
+
+/// Whether a picked app is this Store package. Packages get ProgIds like AppX1a2b3c, which
+/// name the app they belong to.
+#[cfg(windows)]
+fn is_this_package(prog_id: &str) -> bool {
+    use winreg::RegKey;
+    use winreg::enums::HKEY_CLASSES_ROOT;
+    let Some(me) = package_app_id() else { return false };
+    RegKey::predef(HKEY_CLASSES_ROOT)
+        .open_subkey(format!(r"{prog_id}\Application"))
+        .and_then(|k| k.get_value::<String, _>("AppUserModelID"))
+        .is_ok_and(|id| id == me)
 }
 
 /// The app the user picked for a file type. Windows 11 24H2 keeps it in UserChoiceLatest,
@@ -214,6 +263,9 @@ fn registered_marks() -> Option<String> {
 /// somewhere else). Never takes over from another copy that still exists.
 #[cfg(windows)]
 pub fn register_if_needed() {
+    if packaged() {
+        return;
+    }
     let stale = match registered_command() {
         None => true,
         Some(cmd) => {
@@ -313,7 +365,10 @@ fn open_default_apps() {
     use windows::core::HSTRING;
     // A settings link has to go through the shell; explorer.exe given it as an argument just
     // opens Documents.
-    let uri = HSTRING::from(format!("ms-settings:defaultapps?registeredAppUser={APP_NAME}"));
+    let uri = HSTRING::from(match package_app_id() {
+        Some(id) => format!("ms-settings:defaultapps?registeredAUMID={id}"),
+        None => format!("ms-settings:defaultapps?registeredAppUser={APP_NAME}"),
+    });
     // SAFETY: plain strings that outlive the call; no window handle needed.
     unsafe { ShellExecuteW(None, &HSTRING::from("open"), &uri, None, None, SW_SHOWNORMAL) };
 }
@@ -522,5 +577,22 @@ mod tests {
         assert!(!picked.contains(&"png") && !picked.contains(&"mp4") && picked.contains(&"jpg"));
         // The everyday ones have a Linux type.
         assert!(EVERYDAY.iter().all(|e| mime(e).is_some()));
+    }
+
+    /// The Store package lists what the app can be the default for: it can't read that from the code.
+    #[cfg(all(windows, feature = "rar"))]
+    #[test]
+    fn store_manifest_lists_every_type() {
+        let manifest = include_str!("../packaging/windows/AppxManifest.xml");
+        let mut listed: Vec<_> = manifest
+            .split("<uap:FileType>.")
+            .skip(1)
+            .map(|rest| rest.split('<').next().unwrap_or_default())
+            .collect();
+        listed.sort_unstable();
+        let mut opens: Vec<_> =
+            groups().into_iter().flat_map(|(_, exts)| exts).chain([crate::app::MARK_EXT]).collect();
+        opens.sort_unstable();
+        assert_eq!(listed, opens);
     }
 }

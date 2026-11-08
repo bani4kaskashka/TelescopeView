@@ -49,6 +49,24 @@ cp "$bin" "$out/telescopeview"
 cp packaging/linux/telescopeview.desktop "$out/"
 cp packaging/icons/32.png packaging/icons/64.png packaging/icons/128.png packaging/icons/256.png "$out/icons/"
 
+# Select text reads with ocrs, which needs its two models (CC BY-SA 4.0) in ocr/. Fetched once
+# into target/ocr-models and checked; if upstream replaces them, the check fails here on
+# purpose: test the new ones, then update the sums.
+models=target/ocr-models
+mkdir -p "$models"
+for pair in \
+    "text-detection.onnx a917b23dbd9524b465df7e922641b3ff2981623df4ded5a0234004ef2fee7cfe" \
+    "text-recognition.onnx 86c145c2edb96c8caed5b1ebb8f44d706408922211451c309c625157dd6061c5"; do
+    set -- $pair
+    if ! echo "$2  $models/$1" | sha256sum -c - >/dev/null 2>&1; then
+        curl -fsSL -o "$models/$1" "https://ocrs-models.s3-accelerate.amazonaws.com/$1"
+        echo "$2  $models/$1" | sha256sum -c -
+    fi
+done
+mkdir -p "$out/ocr"
+cp "$models/text-detection.onnx" "$models/text-recognition.onnx" "$out/ocr/"
+cp packaging/linux/ocr-models.txt "$out/ocr/README.txt"
+
 if [ "${BUNDLE_FFMPEG:-0}" = 1 ]; then
     [ -n "$ff" ] || { echo "no portable ffmpeg for $arch" >&2; exit 1; }
     base=https://github.com/BtbN/FFmpeg-Builds/releases/download/latest
@@ -77,6 +95,7 @@ app="$HOME/.local/lib/telescopeview"
 mkdir -p "$HOME/.local/bin" "$HOME/.local/share/applications" "$app"
 install -m 755 telescopeview "$app/telescopeview"
 if [ -d ffmpeg ]; then rm -rf "$app/ffmpeg" && cp -R ffmpeg "$app/"; fi
+if [ -d ocr ]; then rm -rf "$app/ocr" && cp -R ocr "$app/"; fi
 ln -sf "$app/telescopeview" "$HOME/.local/bin/telescopeview"
 # The menu entry starts it by its full path (~/.local/bin isn't always on the desktop's PATH).
 sed "s|^Exec=.*|Exec=\"$app/telescopeview\" %f|" telescopeview.desktop > "$HOME/.local/share/applications/telescopeview.desktop"

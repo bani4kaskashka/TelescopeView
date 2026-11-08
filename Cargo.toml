@@ -37,11 +37,22 @@ cpal = "0.18.2"
 [target.'cfg(windows)'.dependencies]
 raw-window-handle = "0.6"
 winreg = "0.55"
-windows = { version = "0.62", features = ["Graphics_Imaging", "Win32_Graphics_Imaging", "Win32_System_Com", "Win32_Foundation", "Win32_UI_Shell", "Win32_UI_WindowsAndMessaging", "Win32_Graphics_Dwm", "Win32_System_Registry", "Data_Pdf", "Storage", "Storage_Streams", "Foundation", "System_UserProfile"] }
+windows = { version = "0.62", features = ["Graphics_Imaging", "Win32_Graphics_Imaging", "Win32_System_Com", "Win32_Foundation", "Win32_UI_Shell", "Win32_UI_WindowsAndMessaging", "Win32_Graphics_Dwm", "Win32_System_Registry", "Win32_Storage_Packaging_Appx", "Data_Pdf", "Storage", "Storage_Streams", "Foundation", "Foundation_Collections", "System_UserProfile", "Media_Ocr"] }
 
 # Delete goes to the Trash / the desktop's trash folder.
 [target.'cfg(not(windows))'.dependencies]
 trash = "5"
+
+# Select text: Apple's Vision reads it on macOS, ocrs (pure Rust, Latin letters) elsewhere.
+[target.'cfg(target_os = "macos")'.dependencies]
+objc2 = "0.6.5"
+objc2-foundation = "0.3.2"
+objc2-vision = { version = "0.3.2", default-features = false, features = ["std", "objc2-core-foundation", "VNRequestHandler", "VNRecognizeTextRequest", "VNRequest", "VNObservation", "VNTypes"] }
+
+[target.'cfg(not(any(windows, target_os = "macos")))'.dependencies]
+ocrs = { version = "0.13.1", default-features = false, features = ["onnx"] }
+# The version ocrs is built on, so its models load into the same type.
+rten = { version = "0.26.0", default-features = false }
 
 [features]
 default = ["rar"]
@@ -75,4 +86,8 @@ assets = [
     ["packaging/icons/128.png", "usr/share/icons/hicolor/128x128/apps/telescopeview.png", "644"],
     ["packaging/icons/64.png", "usr/share/icons/hicolor/64x64/apps/telescopeview.png", "644"],
     ["packaging/icons/32.png", "usr/share/icons/hicolor/32x32/apps/telescopeview.png", "644"],
+    # Select text's models, fetched by packaging/build-linux.sh.
+    ["target/ocr-models/text-detection.onnx", "usr/share/telescopeview/ocr/", "644"],
+    ["target/ocr-models/text-recognition.onnx", "usr/share/telescopeview/ocr/", "644"],
+    ["packaging/linux/ocr-models.txt", "usr/share/telescopeview/ocr/README.txt", "644"],
 ]

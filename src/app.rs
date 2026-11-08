@@ -38,8 +38,9 @@ pub struct Pic {
     pub shade: Vec<[u8; 2]>,
 }
 
-/// A page as drawn last frame: what a glide slides away.
+/// A page as drawn last frame: what a glide slides away, and where Select text looks.
 pub struct Drawn {
+    pub path: PathBuf,
     pub pic: Arc<Pic>,
     pub turns: u8,
     pub rect: Rect,
@@ -501,6 +502,8 @@ pub struct App {
     pub frames: Option<crate::frames::Picker>,
     /// Save an enlarged copy, working on its own thread.
     pub enlarging: Option<crate::enlarging::Job>,
+    /// Select text is on.
+    pub text: Option<crate::textsel::TextSelect>,
 }
 
 /// What the info panel reads from disk, once per page: size and dates, and a photo's EXIF.
@@ -610,6 +613,7 @@ impl App {
             twins: None,
             frames: None,
             enlarging: None,
+            text: None,
         };
         crate::instance::listen(cc.egui_ctx.clone(), app.take_launches.clone(), app.pending_open.clone());
         app.offer_default = Self::default_offer_due(&app.settings);
@@ -1645,6 +1649,15 @@ impl App {
         if hit(Action::CopyImage) {
             self.copy_image(ctx);
         }
+        if hit(Action::CopyText) {
+            self.copy_picked_text(ctx);
+        }
+        if hit(Action::SelectText) {
+            self.toggle_text_select();
+        }
+        if self.text.is_some() && ctx.input(|i| i.modifiers.command && i.key_pressed(Key::A)) {
+            self.pick_all_text(ctx);
+        }
         if hit(Action::CopyPath) {
             self.copy_path(ctx);
         }
@@ -1825,6 +1838,8 @@ impl App {
             if self.show_help || self.show_settings {
                 self.show_help = false;
                 self.show_settings = false;
+            } else if self.text.is_some() {
+                self.text_escape();
             } else if is_fullscreen(ctx) {
                 ctx.send_viewport_cmd(egui::ViewportCommand::Fullscreen(false));
             } else if self.slideshow.is_some() {

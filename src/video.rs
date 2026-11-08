@@ -334,6 +334,8 @@ pub struct Player {
     frames: Receiver<(f64, Vec<Color32>)>,
     next: Option<(f64, Vec<Color32>)>,
     pub texture: Option<TextureHandle>,
+    /// The frame on screen.
+    pub frame: Option<Arc<ColorImage>>,
     children: Vec<Arc<Mutex<Child>>>,
     /// Bumped on every seek, so old reader threads stop.
     generation: Arc<AtomicU64>,
@@ -388,6 +390,7 @@ impl Player {
             frames,
             next: None,
             texture: None,
+            frame: None,
             children: Vec::new(),
             generation: Arc::new(AtomicU64::new(0)),
             error: None,
@@ -590,7 +593,9 @@ impl Player {
             }
         }
         if let Some((_, px)) = shown {
-            let image = ColorImage::new(self.info.size, px);
+            // Shared with the texture, not copied: kept for Select text on a paused frame.
+            let image = Arc::new(ColorImage::new(self.info.size, px));
+            self.frame = Some(image.clone());
             match &mut self.texture {
                 Some(t) => t.set(image, TextureOptions::LINEAR),
                 None => self.texture = Some(ctx.load_texture("video", image, TextureOptions::LINEAR)),

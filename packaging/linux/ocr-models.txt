@@ -1,0 +1,8 @@
+Text recognition models used by Select text on Linux.
+
+text-detection.onnx and text-recognition.onnx are the pre-trained models of the ocrs project
+by Robert Knight (https://github.com/robertknight/ocrs, models at
+https://huggingface.co/robertknight/ocrs), trained on HierText and synthetic data.
+
+They are licensed under Creative Commons Attribution-ShareAlike 4.0 International
+(https://creativecommons.org/licenses/by-sa/4.0/). They are shipped unchanged.

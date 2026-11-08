@@ -1,7 +1,8 @@
 # Windows, macOS and Linux builds on every push and on demand. The packages show up as
 # artifacts on the run's page; pushing a tag like v0.1.0 also attaches them to a release.
 #
-#   Windows x64 / ARM64: portable .zip + installer (-setup.exe), both with ffmpeg
+#   Windows x64 / ARM64: portable .zip + installer (-setup.exe), both with ffmpeg, and the .msix
+#                        for the Microsoft Store (an artifact only: it installs once the Store signs it)
 #   Linux x64 / ARM64:   .zip (with ffmpeg and install.sh) + .deb
 #   macOS (Apple silicon and Intel in one app): .dmg + .zip
 name: build
@@ -53,6 +54,7 @@ jobs:
           path: |
             target/windows/*.zip
             target/windows/*-setup.exe
+            target/windows/*.msix
 
   linux:
     strategy:
@@ -117,8 +119,8 @@ jobs:
         with:
           path: dist
           merge-multiple: true
-      # A SHA-256 checksum for every download, so it can be verified.
-      - run: cd dist && sha256sum * > SHA256SUMS.txt && cat SHA256SUMS.txt
+      # The Store's package isn't a download. A SHA-256 checksum for every one that is, so it can be verified.
+      - run: cd dist && rm -f *.msix && sha256sum * > SHA256SUMS.txt && cat SHA256SUMS.txt
       - uses: softprops/action-gh-release@v2
         with:
           files: dist/*

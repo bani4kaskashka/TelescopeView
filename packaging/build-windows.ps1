@@ -1,7 +1,8 @@
 # Builds the Windows downloads for one architecture:
 #   TelescopeView-<version>-windows-<arch>.zip        (portable: unzip anywhere and run)
 #   TelescopeView-<version>-windows-<arch>-setup.exe  (installer, if Inno Setup 6 is installed)
-# Both carry a portable ffmpeg for videos (LGPL build from BtbN/FFmpeg-Builds, checked against
+#   TelescopeView-<version>-windows-<arch>.msix       (for the Microsoft Store, if the Windows SDK is installed)
+# All carry a portable ffmpeg for videos (LGPL build from BtbN/FFmpeg-Builds, checked against
 # its published checksums).
 #
 #   powershell -ExecutionPolicy Bypass -File packaging/build-windows.ps1 [-Arch x64|arm64]
@@ -57,6 +58,9 @@ Get-ChildItem $pkg -Recurse -Include *.exe, *.dll | ForEach-Object {
 $name = "TelescopeView-$version-windows-$Arch"
 Compress-Archive -Path $pkg -DestinationPath "$out/$name.zip" -Force
 Write-Host "Built $out/$name.zip"
+
+# The Microsoft Store package.
+& "$PSScriptRoot/windows/build-msix.ps1" -Source (Resolve-Path $pkg).Path -Version $version -Arch $Arch -OutDir (Resolve-Path $out).Path
 
 # The installer.
 $iscc = @(

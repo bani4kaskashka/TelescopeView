@@ -55,6 +55,8 @@ pub enum Action {
     Bookmark,
     SaveBookmark,
     Reload,
+    SelectText,
+    CopyText,
     Close,
 }
 
@@ -132,6 +134,8 @@ pub const DEFS: [Def; COUNT] = [
     def(A::Bookmark, "bookmark", "Bookmark the page", &["B"]),
     def(A::SaveBookmark, "save_bookmark", "Save a bookmark file (open it to continue)", &["Ctrl+B"]),
     def(A::Reload, "reload", "Reload the folder", &["F5"]),
+    def(A::SelectText, "select_text", "Select text in the picture", &["Shift+T"]),
+    def(A::CopyText, "copy_text", "Copy the selected text", &["Ctrl+T"]),
     def(A::Close, "close", "Close the window", &["Ctrl+W", "Ctrl+Q"]),
 ];
 
@@ -220,12 +224,26 @@ impl Combo {
 
     /// The combo of a key press, if it can be a shortcut (Esc is kept for closing things).
     pub fn of_event(event: &egui::Event) -> Option<Combo> {
-        match event {
-            egui::Event::Key { key, pressed: true, modifiers, .. } if *key != Key::Escape => {
-                Some(Combo { ctrl: modifiers.command, shift: modifiers.shift && !shift_free(*key), key: *key })
+        match press(event) {
+            Some((key, _, modifiers)) if key != Key::Escape => {
+                Some(Combo { ctrl: modifiers.command, shift: modifiers.shift && !shift_free(key), key })
             }
             _ => None,
         }
+    }
+}
+
+/// A key press as shortcuts see it: the key, whether it's a repeat, and the modifiers held.
+/// egui turns Ctrl+C, Ctrl+X and Ctrl+V into clipboard events and drops the press (Ctrl+V
+/// entirely when the clipboard holds a picture, not text). Their release still comes through,
+/// so for those three the release counts as the press.
+fn press(e: &egui::Event) -> Option<(Key, bool, egui::Modifiers)> {
+    match e {
+        egui::Event::Key { key, pressed: true, repeat, modifiers, .. } => Some((*key, *repeat, *modifiers)),
+        egui::Event::Key { key: key @ (Key::C | Key::X | Key::V), pressed: false, modifiers, .. } if modifiers.command => {
+            Some((*key, false, *modifiers))
+        }
+        _ => None,
     }
 }
 
@@ -267,9 +285,9 @@ impl Keymap {
     pub fn presses(&self, i: &egui::InputState) -> [usize; COUNT] {
         let mut n = [0; COUNT];
         for e in &i.events {
-            if let egui::Event::Key { key, pressed: true, repeat, modifiers, .. } = e {
+            if let Some((key, repeat, modifiers)) = press(e) {
                 for (k, d) in DEFS.iter().enumerate() {
-                    if (d.repeats || !repeat) && self.binds[k].iter().any(|c| c.matches(*key, *modifiers)) {
+                    if (d.repeats || !repeat) && self.binds[k].iter().any(|c| c.matches(key, modifiers)) {
                         n[k] += 1;
                     }
                 }
@@ -347,5 +365,25 @@ mod tests {
         assert!(r.matches(Key::R, egui::Modifiers::NONE));
         assert!(!r.matches(Key::R, shift));
         assert!(Combo::parse("Plus").unwrap().matches(Key::Plus, shift));
+    }
+
+    #[test]
+    fn ctrl_c_and_ctrl_v_count_on_release() {
+        let map = Keymap::new(&BTreeMap::new());
+        let ctrl = egui::Modifiers::COMMAND;
+        let key = |key, pressed, modifiers| egui::Event::Key { key, physical_key: None, pressed, repeat: false, modifiers };
+        let presses = |events: Vec<egui::Event>| {
+            let input = egui::RawInput { events, ..Default::default() };
+            let state = egui::InputState::default().begin_pass(input, false, 1.0, egui::Options::default().input_options);
+            map.presses(&state)
+        };
+        // What egui hands over for Ctrl+C: the copy event, then only the release.
+        let n = presses(vec![egui::Event::Copy, key(Key::C, false, ctrl)]);
+        assert_eq!(n[Action::CopyImage as usize], 1);
+        // Ctrl+V with a picture on the clipboard: just the release.
+        assert_eq!(presses(vec![key(Key::V, false, ctrl)])[Action::Paste as usize], 1);
+        // Other releases are not presses, and Ctrl+T still comes as a press.
+        assert_eq!(presses(vec![key(Key::C, false, egui::Modifiers::NONE)]), [0; COUNT]);
+        assert_eq!(presses(vec![key(Key::T, true, ctrl), key(Key::T, false, ctrl)])[Action::CopyText as usize], 1);
     }
 }

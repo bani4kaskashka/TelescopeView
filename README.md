@@ -188,3 +188,8 @@ The Windows downloads and the Linux `.zip` files include [FFmpeg](https://ffmpeg
 TelescopeView runs it as a separate program for video playback. FFmpeg is licensed under the
 GNU LGPL 2.1 or later; its license text is in `ffmpeg/LICENSE.txt`, and its source code is
 available at <https://ffmpeg.org/download.html>.
+
+Select text uses [ocrs](https://github.com/robertknight/ocrs) and [RTen](https://github.com/robertknight/rten)
+on Linux (MIT or Apache-2.0). Their models come with the Linux downloads in the `ocr/` folder and
+are licensed under [CC BY-SA 4.0](https://creativecommons.org/licenses/by-sa/4.0/); they are not
+in this repository, `packaging/build-linux.sh` downloads them.

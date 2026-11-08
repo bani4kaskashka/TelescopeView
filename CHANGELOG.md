@@ -6,6 +6,18 @@ All notable changes to TelescopeView are listed here. The format follows
 
 ## [Unreleased]
 
+### Added
+- Select text: Shift+T, or the ... menu or a right-click, reads the words in the pictures on
+  screen (comic pages and paused video frames too). Drag, click a word or double-click a line,
+  then Ctrl+T copies it. On a picture that fits the window, hold the left button for a moment
+  and drag. Works offline: Windows' own text recognition, Apple's Vision on a Mac, and the
+  ocrs models on Linux (Latin letters only).
+- A Microsoft Store package (.msix) is built with the Windows downloads. It isn't on the
+  release page: it installs once the Store signs it.
+
+### Fixed
+- Ctrl+C, Ctrl+Shift+C and Ctrl+V did nothing from the keyboard, only from the menu.
+
 ## [1.1.0]
 
 ### Added
